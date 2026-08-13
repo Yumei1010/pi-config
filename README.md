@@ -5,8 +5,18 @@
 ## 包含
 
 - 15 个 Narumiruna 插件（goal / plan-mode / subagents / firecrawl / lsp 等）
-- 3 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换）
+- 4 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换 + 项目记忆）
 - pi-web-access / pi-mcp-adapter
+
+## 项目记忆扩展（project-memory）
+
+解决上下文用满后新开会话丢失项目上下文的问题：目标 / 进度 / 决策 / 待办自动保存到 `.pi/memory.md`，每次请求自动注入，新会话直接续上之前的工作。
+
+- `/memory` — 查看项目记忆
+- `/memory save` — 让 AI 生成/更新记忆快照
+- `/memory clear` — 清空记忆
+
+上下文使用率 ≥85% 时自动提醒先保存再开新会话；LLM 也会在完成里程碑时自主调用 `project_memory` 工具更新记忆。
 
 ## 模型切换扩展（provider-switch）
 
