@@ -68,7 +68,21 @@ const CN_MAP: Record<string, string> = {
   mcp: "MCP 网关",
   "mcp-auth": "MCP 认证",
   llama: "本地 Llama 模型",
+  // skill 命令（/skill:<name>）
+  "skill:mcp-scripting": "mcpScript 脚本编写指南",
+  // 命令补全可能带 argumentHint（value 形如 "goal"），前缀匹配用
 };
+
+/** 尝试精确匹配或带 skill:/模板前缀的 name */
+function lookupCn(name: string): string | undefined {
+  if (CN_MAP[name]) return CN_MAP[name];
+  // skill:foo / template:foo 尝试去掉前缀后的名字直接匹配
+  if (name.includes(":")) {
+    const plain = name.slice(name.indexOf(":") + 1);
+    if (CN_MAP[plain]) return CN_MAP[plain];
+  }
+  return undefined;
+}
 
 /** 内置命令名（用于 /all 的分组展示） */
 const BUILTIN_NAMES = [
@@ -113,7 +127,7 @@ export default function (pi: ExtensionAPI) {
       const untranslated: string[] = [];
       for (const cmd of news) {
         const base = baseName(cmd.name);
-        if (CN_MAP[base]) continue;
+        if (lookupCn(base)) continue;
         const desc = cmd.description ?? "";
         if (hasCjk(desc)) {
           CN_MAP[base] = desc; // 新插件自带中文描述 → 直接采纳
@@ -158,7 +172,7 @@ export default function (pi: ExtensionAPI) {
         const items = base.items.map((item) => {
           const raw = String(item.value ?? "");
           const name = raw.replace(/^\//, "").replace(/:\d+$/, "");
-          const cn = CN_MAP[name];
+          const cn = lookupCn(name);
           if (!cn) return item;
           return { ...item, description: cn };
         });
@@ -211,14 +225,16 @@ export default function (pi: ExtensionAPI) {
       if (templates.length > 0) {
         lines.push("\n▍提示模板");
         for (const cmd of templates) {
-          lines.push(`  /${cmd.name} — ${cmd.description ?? ""}`);
+          const cn = lookupCn(baseName(cmd.name)) ?? cmd.description ?? "";
+          lines.push(`  /${cmd.name} — ${cn}`);
         }
       }
       const skills = commands.filter((c) => c.source === "skill");
       if (skills.length > 0) {
         lines.push("\n▍技能");
         for (const cmd of skills) {
-          lines.push(`  /${cmd.name} — ${cmd.description ?? ""}`);
+          const cn = lookupCn(baseName(cmd.name)) ?? cmd.description ?? "";
+          lines.push(`  /${cmd.name} — ${cn}`);
         }
       }
 
