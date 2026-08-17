@@ -56,6 +56,18 @@ GFramework 项目（存在 CONVENTIONS.md + csproj）会自动注入规范速查
 
 **工作流：** 上下文快满 → 自动保存记忆 → `/new` 新会话 → 记忆自动注入，说“继续”即可无缝衔接。
 
+**云同步（一个私有仓库存所有项目记忆）：**
+
+```
+/memory cloud set <私有仓库URL>   配置云端仓库（如 GitHub 私有仓库）
+/memory cloud push               本地记忆 → 云端（本机为准）
+/memory cloud pull               云端 → 本地（换机恢复用）
+/memory cloud status             查看同步状态
+/memory cloud on / off           开启/关闭自动推送（记忆变化后节流同步）
+```
+
+仓库布局：`global.md` + `projects/<项目名>/memory.md`；本地工作区 `~/.pi/agent/memory-cloud/`；需要已配置 git 凭据/代理（继承 git 全局配置）。
+
 ## 模型切换扩展（provider-switch）
 
 `/switch` 在 DeepSeek 直连 与 OpenCode Go 订阅之间切换模型：

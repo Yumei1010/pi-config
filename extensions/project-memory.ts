@@ -1,5 +1,5 @@
 /**
- * Project Memory v2 — 两级记忆知识库（全局 + 项目）
+ * Project Memory v2.1 — 两级记忆知识库（全局 + 项目）+ GitHub 私有仓库云同步
  *
  * 解决"上下文用满被迫新开会话，新会话要重新熟悉项目"的问题：
  * - 全局记忆：~/.pi/agent/memory.md（跨项目：偏好 / 经验 / 习惯）
@@ -10,20 +10,28 @@
  *   3. LLM 在完成里程碑时自主调用 project_memory 工具
  * - 每次请求自动注入：全局记忆 → 项目记忆 → 最近修改文件，新会话直接续上
  *
+ * 云同步（一个私有仓库存所有项目记忆）：
+ * - 仓库布局：global.md + projects/<项目名>/memory.md
+ * - 本地工作区：~/.pi/agent/memory-cloud/
+ * - /memory cloud set <URL> · push · pull · status · on(自动推送) · off
+ * - 私有仓库需已配置 git 凭据/代理（继承 git 全局配置）
+ *
  * 用法：
- *   /memory             查看项目记忆
- *   /memory global      查看全局记忆
- *   /memory save        让 AI 生成/更新记忆快照
- *   /memory clear       清空项目记忆
+ *   /memory              查看项目记忆
+ *   /memory global       查看全局记忆
+ *   /memory save         让 AI 生成/更新记忆快照
+ *   /memory clear        清空项目记忆
  *   /memory clear-global 清空全局记忆
+ *   /memory cloud …      云同步子命令
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CONFIG_DIR_NAME, getAgentDir, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, join, relative, resolve, sep } from "node:path";
 
 const PROJECT_MEMORY_FILE = "memory.md";
 const GLOBAL_MEMORY_FILE = "memory.md";
@@ -40,6 +48,18 @@ const MAX_CHANGES = 20;
 const AUTO_SAVE_THRESHOLD = 80;
 /** 临界警告阈值 */
 const CRITICAL_THRESHOLD = 95;
+
+/** 云端记忆仓库配置文件名（位于 agentDir） */
+const CLOUD_CONFIG_FILE = "memory-cloud.json";
+/** 云端仓库本地工作区目录名（位于 agentDir） */
+const CLOUD_DIR = "memory-cloud";
+/** 自动推送节流（毫秒） */
+const AUTO_SYNC_THROTTLE_MS = 60_000;
+
+interface CloudConfig {
+  repoUrl: string;
+  autoSync: boolean;
+}
 
 const SECTIONS = [
   "goal",
@@ -167,9 +187,170 @@ function truncate(text: string, max: number, fileLabel: string): string {
   return text.slice(0, max) + `\n\n…（${fileLabel} 已截断，完整内容请用 project_memory 工具 operation=read 查看）`;
 }
 
+// ── 云同步：GitHub 私有仓库记忆仓库 ────────────────────────
+
+function cloudConfigPath(): string {
+  return join(getAgentDir(), CLOUD_CONFIG_FILE);
+}
+
+function cloudRepoDir(): string {
+  return join(getAgentDir(), CLOUD_DIR);
+}
+
+async function loadCloudConfig(): Promise<CloudConfig | null> {
+  try {
+    const raw = await readFile(cloudConfigPath(), "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.repoUrl === "string" && parsed.repoUrl) {
+      return { repoUrl: parsed.repoUrl, autoSync: !!parsed.autoSync };
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+async function saveCloudConfig(config: CloudConfig): Promise<void> {
+  await writeText(cloudConfigPath(), JSON.stringify(config, null, 2));
+}
+
+/** 执行 git 命令，返回退出码与输出 */
+async function git(args: string[], cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    execFile(
+      "git",
+      args,
+      { cwd, maxBuffer: 10 * 1024 * 1024, timeout: 120_000 },
+      (err, stdout, stderr) => {
+        resolve({ code: err ? (err as NodeJS.ErrnoException).code ?? 1 : 0, stdout: stdout || "", stderr: stderr || "" });
+      },
+    );
+  });
+}
+
+/** 项目标识：目录名（云端 projects/ 下的子目录名） */
+function projectSlug(cwd: string): string {
+  return basename(cwd) || "root";
+}
+
+/** 云端仓库 → 本地记忆的映射（push: 本地→云端；pull: 云端→本地） */
+async function cloudEnsureRepo(config: CloudConfig): Promise<{ ok: boolean; message: string }> {
+  const dir = cloudRepoDir();
+  try {
+    await readFile(join(dir, ".git", "HEAD"));
+    // 已存在：尝试拉取最新（失败不阻塞，留待 push 前再试）
+    const pull = await git(["pull", "--ff-only"], dir);
+    if (pull.code !== 0 && !/Already up to date|up to date/i.test(pull.stdout + pull.stderr)) {
+      return { ok: true, message: "仓库已存在（pull 未完全成功，push 时重试）" };
+    }
+    return { ok: true, message: "" };
+  } catch {
+    // 不存在：clone
+    const parent = join(getAgentDir());
+    const clone = await git(["clone", config.repoUrl, CLOUD_DIR], parent);
+    if (clone.code !== 0) {
+      return { ok: false, message: `clone 失败：${clone.stderr.trim() || clone.stdout.trim()}` };
+    }
+    return { ok: true, message: "" };
+  }
+}
+
+/** push：本地记忆 → 云端仓库（本机为准，先 pull 基线再覆盖） */
+async function cloudPush(cwd: string): Promise<{ ok: boolean; message: string }> {
+  const config = await loadCloudConfig();
+  if (!config) return { ok: false, message: "未配置云端仓库。先运行 /memory cloud set <仓库URL>" };
+
+  const ensure = await cloudEnsureRepo(config);
+  if (!ensure.ok) return ensure;
+  const repo = cloudRepoDir();
+
+  // 再次 pull 确保基线最新（容错）
+  await git(["pull", "--ff-only"], repo);
+
+  // 复制：全局记忆 + 当前项目记忆
+  const pairs: Array<[string, string]> = [
+    [globalMemoryPath(), join(repo, "global.md")],
+    [projectMemoryPath(cwd), join(repo, "projects", projectSlug(cwd), "memory.md")],
+  ];
+  for (const [src, dst] of pairs) {
+    const content = await readText(src);
+    if (!content.trim()) continue; // 空记忆不上传
+    await mkdir(join(dst, ".."), { recursive: true });
+    await copyFile(src, dst);
+  }
+
+  const status = await git(["status", "--porcelain"], repo);
+  if (status.code === 0 && !status.stdout.trim()) {
+    return { ok: true, message: "云端已是最新，无需推送。" };
+  }
+
+  // commit 身份：优先 git 全局/仓库级，兜底默认
+  const nameRes = await git(["config", "user.name"], repo);
+  const emailRes = await git(["config", "user.email"], repo);
+  const name = nameRes.stdout.trim() || "pi-memory-sync";
+  const email = emailRes.stdout.trim() || "pi-memory-sync@local";
+
+  const add = await git(["add", "-A"], repo);
+  if (add.code !== 0) return { ok: false, message: `git add 失败：${add.stderr.trim()}` };
+  const commit = await git(
+    ["-c", `user.name=${name}`, "-c", `user.email=${email}`, "commit", "-m", `sync memory: ${projectSlug(cwd)}`],
+    repo,
+  );
+  if (commit.code !== 0) return { ok: false, message: `git commit 失败：${commit.stderr.trim() || commit.stdout.trim()}` };
+  const push = await git(["push"], repo);
+  if (push.code !== 0) {
+    return { ok: false, message: `git push 失败：${push.stderr.trim() || push.stdout.trim()}\n（检查网络/凭据/代理，或手动在 ${repo} 推送）` };
+  }
+  return { ok: true, message: `已推送记忆到云端（${projectSlug(cwd)}）` };
+}
+
+/** pull：云端 → 本地记忆（云端为准，覆盖本地） */
+async function cloudPull(cwd: string): Promise<{ ok: boolean; message: string }> {
+  const config = await loadCloudConfig();
+  if (!config) return { ok: false, message: "未配置云端仓库。先运行 /memory cloud set <仓库URL>" };
+
+  const ensure = await cloudEnsureRepo(config);
+  if (!ensure.ok) return ensure;
+  const repo = cloudRepoDir();
+
+  const pull = await git(["pull", "--ff-only"], repo);
+  if (pull.code !== 0 && !/Already up to date|up to date/i.test(pull.stdout + pull.stderr)) {
+    return { ok: false, message: `git pull 失败：${pull.stderr.trim() || pull.stdout.trim()}` };
+  }
+
+  const pairs: Array<[string, string]> = [
+    [join(repo, "global.md"), globalMemoryPath()],
+    [join(repo, "projects", projectSlug(cwd), "memory.md"), projectMemoryPath(cwd)],
+  ];
+  let restored = 0;
+  for (const [src, dst] of pairs) {
+    const content = await readText(src);
+    if (!content.trim()) continue;
+    await mkdir(join(dst, ".."), { recursive: true });
+    await copyFile(src, dst);
+    restored++;
+  }
+  return { ok: true, message: restored > 0 ? `已从云端恢复记忆（全局 + ${projectSlug(cwd)}）` : "云端没有可恢复的记忆" };
+}
+
+async function cloudStatus(cwd: string): Promise<string> {
+  const config = await loadCloudConfig();
+  if (!config) return "未配置云端记忆仓库。运行 /memory cloud set <私有仓库URL> 开启。";
+  const repo = cloudRepoDir();
+  let local = "?", remote = "?";
+  try {
+    await readFile(join(repo, ".git", "HEAD"));
+    const rev = await git(["rev-parse", "--short", "HEAD"], repo);
+    local = rev.stdout.trim() || "?";
+    const remoteRev = await git(["ls-remote", "origin", "HEAD"], repo);
+    remote = remoteRev.stdout.split(/\s+/)[0]?.slice(0, 7) || "?";
+  } catch { /* not cloned */ }
+  return `云端仓库：${config.repoUrl}\n本地工作区：${repo}\n自动推送：${config.autoSync ? "开" : "关"}\n本地 HEAD：${local} / 远端 HEAD：${remote}`;
+}
+
 export default function (pi: ExtensionAPI) {
   // 防止预警/自动保存刷屏：只有进入更高档位才触发
   let warnBand = 0;
+  // 自动推送节流时间戳
+  let lastAutoSync = 0;
   // 本会话内跟踪的最近修改文件
   const sessionChanges = new Map<string, { tool: string; timestamp: number }>();
 
@@ -316,15 +497,31 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("agent_settled", async (_event, ctx) => {
-    if (sessionChanges.size === 0) return;
-    const existing = await readChanges(ctx.cwd);
-    const byPath = new Map(existing.map((c) => [c.path, c]));
-    for (const [path, info] of sessionChanges) {
-      byPath.set(path, { path, tool: info.tool, timestamp: info.timestamp });
+    if (sessionChanges.size > 0) {
+      const existing = await readChanges(ctx.cwd);
+      const byPath = new Map(existing.map((c) => [c.path, c]));
+      for (const [path, info] of sessionChanges) {
+        byPath.set(path, { path, tool: info.tool, timestamp: info.timestamp });
+      }
+      const merged = Array.from(byPath.values()).sort((a, b) => b.timestamp - a.timestamp);
+      await writeChanges(ctx.cwd, merged);
+      sessionChanges.clear();
     }
-    const merged = Array.from(byPath.values()).sort((a, b) => b.timestamp - a.timestamp);
-    await writeChanges(ctx.cwd, merged);
-    sessionChanges.clear();
+
+    // ── 自动推送（autoSync 开启时，记忆变化后节流同步） ────
+    try {
+      const config = await loadCloudConfig();
+      if (config?.autoSync) {
+        const now = Date.now();
+        if (now - lastAutoSync > AUTO_SYNC_THROTTLE_MS) {
+          lastAutoSync = now;
+          const pushResult = await cloudPush(ctx.cwd);
+          if (!pushResult.ok) {
+            ctx.ui.notify(`云同步失败：${pushResult.message}`, "warning");
+          }
+        }
+      }
+    } catch { /* ignore */ }
   });
 
   // ── 自动维护 2：上下文接近上限时自动触发记忆保存 ────────────
@@ -357,9 +554,65 @@ export default function (pi: ExtensionAPI) {
 
   // ── /memory 命令 ──────────────────────────────────────────
   pi.registerCommand("memory", {
-    description: "记忆：/memory 项目记忆 · /memory global 全局记忆 · save 保存 · clear 清空 · clear-global 清空全局",
+    description: "记忆：/memory 项目 · global 全局 · save 保存 · clear 清空 · cloud 云同步",
+    getArgumentCompletions: (prefix) => {
+      const words = ["global", "save", "clear", "clear-global", "cloud", "cloud set", "cloud push", "cloud pull", "cloud status", "cloud on", "cloud off"];
+      return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
+    },
     handler: async (args, ctx) => {
       const arg = args.trim();
+
+      // ── 云同步子命令 ──────────────────────────────────────
+      if (arg.startsWith("cloud")) {
+        const sub = arg.slice("cloud".length).trim();
+        if (sub === "set") {
+          ctx.ui.notify("用法：/memory cloud set <私有仓库URL>，例如 /memory cloud set https://github.com/你/记忆仓库.git", "info");
+          return;
+        }
+        if (sub.startsWith("set ")) {
+          const repoUrl = sub.slice(4).trim();
+          const validUrl = /^(https?:|git@|file:)/.test(repoUrl) || /^[a-zA-Z]:[\\/]/.test(repoUrl);
+          if (!validUrl) {
+            ctx.ui.notify(`仓库地址无效：${repoUrl}（需 http(s):// 或 git@ 或本地路径）`, "error");
+            return;
+          }
+          const prev = await loadCloudConfig();
+          await saveCloudConfig({ repoUrl, autoSync: prev?.autoSync ?? false });
+          ctx.ui.notify(`已配置云端记忆仓库：${repoUrl}\n首次推送请运行 /memory cloud push（私有仓库需已配置 git 凭据/代理）`, "success");
+          return;
+        }
+        if (sub === "push" || sub === "sync") {
+          ctx.ui.notify("正在推送记忆到云端…", "info");
+          const result = await cloudPush(ctx.cwd);
+          ctx.ui.notify(result.message, result.ok ? "success" : "error");
+          return;
+        }
+        if (sub === "pull") {
+          ctx.ui.notify("正在从云端拉取记忆…", "info");
+          const result = await cloudPull(ctx.cwd);
+          ctx.ui.notify(result.message, result.ok ? "success" : "error");
+          return;
+        }
+        if (sub === "status") {
+          ctx.ui.notify(await cloudStatus(ctx.cwd), "info");
+          return;
+        }
+        if (sub === "on") {
+          const config = await loadCloudConfig();
+          if (!config) { ctx.ui.notify("未配置云端仓库。先运行 /memory cloud set <URL>", "error"); return; }
+          await saveCloudConfig({ ...config, autoSync: true });
+          ctx.ui.notify("自动推送已开启：记忆变化后自动同步到云端。", "success");
+          return;
+        }
+        if (sub === "off") {
+          const config = await loadCloudConfig();
+          if (config) await saveCloudConfig({ ...config, autoSync: false });
+          ctx.ui.notify("自动推送已关闭。", "info");
+          return;
+        }
+        ctx.ui.notify("用法：/memory cloud set <URL> · push · pull · status · on · off", "info");
+        return;
+      }
 
       if (arg === "save") {
         pi.sendUserMessage(
