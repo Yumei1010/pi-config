@@ -1,8 +1,9 @@
 /**
- * Code Review 代码规范审查插件
+ * Conventions Review 个人约定审查插件
  *
- * 基于 GFramework Godot 项目（Twenty-four / My-GFramework-Godot-Template /
- * My-GFramework-Godot-AVG-Template）的 CONVENTIONS.md 提炼的可执行规范检查器。
+ * 从个人 GFramework Godot 模板项目（Twenty-four / My-GFramework-Godot-Template /
+ * My-GFramework-Godot-AVG-Template）的 CONVENTIONS.md 提炼的个人代码规范检查器，
+ * 仅适用于这套框架风格的项目，不具备泛用性。
  *
  * 静态规则引擎（零成本、确定性）：
  *   命名空间 / sealed / 属性可变性 / required / struct 禁止 / partial /
@@ -10,13 +11,13 @@
  *   _Ready() 调用链等 15+ 条规则
  *
  * 用法：
- *   /review            审查 git 未提交变更（新增/修改的 .cs）
- *   /review <path>     审查指定文件或目录
- *   /review --all      审查整个 scripts/ 目录
- *   /review --staged   审查已暂存变更
+ *   /conventions            审查 git 未提交变更（新增/修改的 .cs）
+ *   /conventions <path>     审查指定文件或目录
+ *   /conventions --all      审查整个 scripts/ 目录
+ *   /conventions --staged   审查已暂存变更
  *
  * LLM 工具：
- *   review_code        模型完成代码修改后自检（静态规则 + 架构约束提示）
+ *   conventions_review      模型完成代码修改后自检（静态规则 + 架构约束提示）
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -579,19 +580,19 @@ export default function (pi: ExtensionAPI) {
         `- UI 页面不提 I* 接口；目录名全部 snake_case\n` +
         `- _Ready() 只做调用链：ReadyAsync() → ConnectSignal() → RegisterEvent()\n` +
         `- 提交格式 <type>(<scope>): <中文描述>，每次提交为逻辑独立的原子操作\n` +
-        `- 修改代码后可用 review_code 工具自检`,
+        `- 修改代码后可用 conventions_review 工具自检`,
     };
   });
 
-  // ── LLM 工具：review_code ─────────────────────────────────
+  // ── LLM 工具：conventions_review ─────────────────────────
   pi.registerTool({
-    name: "review_code",
-    label: "Review Code",
+    name: "conventions_review",
+    label: "Review Conventions",
     description:
-      "按项目代码规范（GFramework 约定）审查 C# 代码：命名空间、sealed、属性可变性（事件 init / 命令 set）、required、命令输入 struct 禁止、Godot 节点 partial 与 [Log]+[ContextAware] 成对、GetNode % 唯一名称、XML 中文注释、目录 snake_case、_Ready 调用链等。默认审查 git 未提交变更，也可指定文件或目录。",
-    promptSnippet: "按项目规范审查代码（命名空间/sealed/属性可变性/注释等）",
+      "按个人 GFramework 代码规范审查 C# 代码：命名空间、sealed、属性可变性（事件 init / 命令 set）、required、命令输入 struct 禁止、Godot 节点 partial 与 [Log]+[ContextAware] 成对、GetNode % 唯一名称、XML 中文注释、目录 snake_case、_Ready 调用链等。默认审查 git 未提交变更，也可指定文件或目录。",
+    promptSnippet: "按个人 GFramework 规范审查代码（命名空间/sealed/属性可变性/注释等）",
     promptGuidelines: [
-      "Use review_code to self-check code against project conventions after making or modifying C# files, especially before suggesting a commit.",
+      "Use conventions_review to self-check code against the personal GFramework conventions after making or modifying C# files, especially before suggesting a commit.",
     ],
     parameters: Type.Object({
       path: Type.Optional(
@@ -636,9 +637,9 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // ── /review 命令 ──────────────────────────────────────────
-  pi.registerCommand("review", {
-    description: "代码规范审查：/review [path|--all|--staged]",
+  // ── /conventions 命令 ────────────────────────────────────
+  pi.registerCommand("conventions", {
+    description: "个人约定审查：/conventions [path|--all|--staged]",
     getArgumentCompletions: (prefix) => {
       const words = ["--all", "--staged", "scripts/"];
       return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
@@ -677,7 +678,7 @@ export default function (pi: ExtensionAPI) {
       } else {
         files = await getGitChangedFiles(cwd, false);
         if (files.length === 0) {
-          ctx.ui.notify("没有未提交的 .cs 变更。可用 /review --all 审查整个 scripts/，或 /review <path> 指定路径。", "info");
+          ctx.ui.notify("没有未提交的 .cs 变更。可用 /conventions --all 审查整个 scripts/，或 /conventions <path> 指定路径。", "info");
           return;
         }
       }

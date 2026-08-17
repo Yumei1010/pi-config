@@ -8,9 +8,9 @@
 - 5 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换 + 项目记忆 + 代码审查）
 - pi-web-access / pi-mcp-adapter
 
-## 代码规范审查扩展（code-review）
+## 个人约定审查扩展（conventions-review）
 
-基于 GFramework 模板项目（Twenty-four / Godot-Template / AVG-Template）的 CONVENTIONS.md 提炼的可执行规范检查器，零成本静态检测：
+从个人 GFramework 模板项目（Twenty-four / Godot-Template / AVG-Template）的 CONVENTIONS.md 提炼的**个人风格**规范检查器，仅适用于这套框架风格的项目，零成本静态检测：
 
 - 命名空间（文件范围声明 / 与目录一一对应）
 - CQRS 事件/命令（sealed / 属性 init vs set / required / struct 禁止）
@@ -18,13 +18,13 @@
 - XML 中文注释 / snake_case 目录 / _Ready() 调用链
 
 ```
-/review            审查 git 未提交变更
-/review <path>     审查指定文件或目录
-/review --all      审查整个 scripts/
-/review --staged   审查已暂存变更
+/conventions            审查 git 未提交变更
+/conventions <path>     审查指定文件或目录
+/conventions --all      审查整个 scripts/
+/conventions --staged   审查已暂存变更
 ```
 
-GFramework 项目（存在 CONVENTIONS.md + csproj）会自动注入规范速查；LLM 也可用 `review_code` 工具在提交前自检。
+GFramework 项目（存在 CONVENTIONS.md + csproj）会自动注入规范速查；LLM 也可用 `conventions_review` 工具在提交前自检。
 
 ## 项目记忆扩展（project-memory）
 
