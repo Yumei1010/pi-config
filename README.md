@@ -5,8 +5,15 @@
 ## 包含
 
 - 15 个 Narumiruna 插件（goal / plan-mode / subagents / firecrawl / lsp 等）
-- 5 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换 + 项目记忆 + 代码审查）
+- 6 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换 + 项目记忆 + 个人约定审查 + 指令汉化）
 - pi-web-access / pi-mcp-adapter
+
+## 指令汉化扩展（command-cn）
+
+指令保持英文原名，但补全/帮助中的说明文字汉化为中文：
+
+- 输入 `/` 时，命令补全列表的每条说明显示中文
+- `/指令` — 列出全部指令 + 中文说明一览（内置 + 扩展 + 模板 + skill）
 
 ## 个人约定审查扩展（conventions-review）
 
