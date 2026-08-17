@@ -27,6 +27,7 @@ foreach ($pkg in $packages) {
 
 $extDir = "$env:USERPROFILE\.pi\agent\extensions"
 New-Item -ItemType Directory -Force -Path $extDir | Out-Null
-Copy-Item "$PSScriptRoot\extensions\*.ts" -Destination $extDir -Force
+# 每个插件一个子目录，递归复制
+Get-ChildItem "$PSScriptRoot\extensions" -Directory | Copy-Item -Destination $extDir -Recurse -Force
 Write-Host "自定义扩展已安装"
 Write-Host "=== 完成 === 运行 pi 然后输入 /reload"

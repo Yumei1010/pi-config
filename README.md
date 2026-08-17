@@ -1,82 +1,22 @@
 # Pi 开发环境配置
 
-一键在新电脑上复刻 Pi 编码助手配置。
+一键在新电脑上复刻 Pi 编码助手配置。每个自定义插件一个专有文件夹 + 一份 README。
 
-## 包含
+## 自定义插件
+
+| 插件 | 功能 | 文档 |
+|------|------|------|
+| **claude-md-loader** | 自动加载 CLAUDE.md 注入系统提示词 | [README](extensions/claude-md-loader/README.md) |
+| **minimal-statusline** | 极简多彩状态栏（模型/上下文/Token/费用） | [README](extensions/minimal-statusline/README.md) |
+| **provider-switch** | DeepSeek 直连 / OpenCode Go 模型切换 | [README](extensions/provider-switch/README.md) |
+| **project-memory** | 两级记忆知识库 + GitHub 私有仓库云同步 | [README](extensions/project-memory/README.md) |
+| **conventions-review** | 个人 GFramework 代码规范审查 | [README](extensions/conventions-review/README.md) |
+| **command-chinese** | 指令说明汉化 + /all 指令一览 | [README](extensions/command-chinese/README.md) |
+
+## 依赖插件
 
 - 15 个 Narumiruna 插件（goal / plan-mode / subagents / firecrawl / lsp 等）
-- 6 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换 + 项目记忆 + 个人约定审查 + 指令汉化）
 - pi-web-access / pi-mcp-adapter
-
-## 指令汉化扩展（command-chinese）
-
-指令保持英文原名，但补全/帮助中的说明文字汉化为中文：
-
-- 输入 `/` 时，命令补全列表的每条说明显示中文
-- `/all`（或 `/all command`）— 列出全部指令 + 中文说明一览（内置 + 扩展 + 模板 + skill）
-- **自动汉化钩子**：检测到新增插件注册的新指令时自动调用——
-  - 新指令 description 是中文 → 直接采纳
-  - 否则查用户配置 `.pi/command-cn-map.json`（`{ "命令名": "中文说明" }`）
-  - 同时 emit `command-chinese:commands-updated` 事件供其他扩展监听补充
-
-## 个人约定审查扩展（conventions-review）
-
-从个人 GFramework 模板项目（Twenty-four / Godot-Template / AVG-Template）的 CONVENTIONS.md 提炼的**个人风格**规范检查器，仅适用于这套框架风格的项目，零成本静态检测：
-
-- 命名空间（文件范围声明 / 与目录一一对应）
-- CQRS 事件/命令（sealed / 属性 init vs set / required / struct 禁止）
-- Godot 节点（partial / [Log]+[ContextAware] 成对 / GetNode % 唯一名称）
-- XML 中文注释 / snake_case 目录 / _Ready() 调用链
-
-```
-/conventions            审查 git 未提交变更
-/conventions <path>     审查指定文件或目录
-/conventions --all      审查整个 scripts/
-/conventions --staged   审查已暂存变更
-```
-
-GFramework 项目（存在 CONVENTIONS.md + csproj）会自动注入规范速查；LLM 也可用 `conventions_review` 工具在提交前自检。
-
-## 项目记忆扩展（project-memory）
-
-解决上下文用满后新开会话丢失项目上下文的问题——**两级记忆 + 三重自动维护**，新会话自动注入记忆，直接续上之前的工作。
-
-**两级记忆：**
-
-- **项目记忆** `.pi/memory.md` — 目标 / 进度 / 决策 / 待办 / 关键文件，同项目多会话共享
-- **全局记忆** `~/.pi/agent/memory.md` — 跨项目长期偏好与经验（scope=global）
-
-**三重自动维护：**
-
-1. 上下文使用率 ≥80% 时**自动触发记忆保存**（无需手动）
-2. **自动跟踪** edit/write 修改的文件（`.pi/changes.json`，注入时提示最近改过什么）
-3. LLM 完成里程碑时**自主调用** `project_memory` 工具更新记忆
-
-**命令：** `/memory`（查看项目）· `/memory global`（查看全局）· `/memory save`（生成快照）· `/memory clear` / `/memory clear-global`
-
-**工作流：** 上下文快满 → 自动保存记忆 → `/new` 新会话 → 记忆自动注入，说“继续”即可无缝衔接。
-
-**云同步（一个私有仓库存所有项目记忆）：**
-
-```
-/memory cloud set <私有仓库URL>   配置云端仓库（如 GitHub 私有仓库）
-/memory cloud push               本地记忆 → 云端（本机为准）
-/memory cloud pull               云端 → 本地（换机恢复用）
-/memory cloud status             查看同步状态
-/memory cloud on / off           开启/关闭自动推送（记忆变化后节流同步）
-```
-
-仓库布局：`global.md` + `projects/<项目名>/memory.md`；本地工作区 `~/.pi/agent/memory-cloud/`；需要已配置 git 凭据/代理（继承 git 全局配置）。
-
-## 模型切换扩展（provider-switch）
-
-`/switch` 在 DeepSeek 直连 与 OpenCode Go 订阅之间切换模型：
-
-- `/switch` — 交互选择器
-- `/switch ds` — 切到 DeepSeek 直连
-- `/switch go` — 切到 OpenCode Go
-
-使用前需在 `~/.pi/agent/auth.json` 配置 `deepseek` 和 `opencode-go` 的 API Key（或设置 `OPENCODE_API_KEY` 环境变量）。
 
 ## 安装
 
@@ -89,3 +29,5 @@ cd ~/pi-config
 ```
 
 安装完成后启动 `pi`，输入 `/reload` 即可。
+
+> 从旧版（平铺单文件）升级：删除 `~/.pi/agent/extensions/` 下的旧 `.ts` 文件后重新安装。

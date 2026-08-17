@@ -26,10 +26,10 @@ for pkg in "${PACKAGES[@]}"; do
   pi install "$pkg"
 done
 
-# 安装自定义扩展
+# 安装自定义扩展（每个插件一个子目录，递归复制）
 EXT_DIR="$HOME/.pi/agent/extensions"
 mkdir -p "$EXT_DIR"
-cp "$(dirname "$0")/extensions/"*.ts "$EXT_DIR/"
+cp -r "$(dirname "$0")/extensions/." "$EXT_DIR/"
 echo "自定义扩展已安装"
 
 echo "=== 完成 ==="
