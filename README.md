@@ -8,12 +8,16 @@
 - 6 个自定义扩展（CLAUDE.md 加载器 + 极简状态栏 + 模型切换 + 项目记忆 + 个人约定审查 + 指令汉化）
 - pi-web-access / pi-mcp-adapter
 
-## 指令汉化扩展（command-cn）
+## 指令汉化扩展（command-chinese）
 
 指令保持英文原名，但补全/帮助中的说明文字汉化为中文：
 
 - 输入 `/` 时，命令补全列表的每条说明显示中文
-- `/指令` — 列出全部指令 + 中文说明一览（内置 + 扩展 + 模板 + skill）
+- `/all`（或 `/all command`）— 列出全部指令 + 中文说明一览（内置 + 扩展 + 模板 + skill）
+- **自动汉化钩子**：检测到新增插件注册的新指令时自动调用——
+  - 新指令 description 是中文 → 直接采纳
+  - 否则查用户配置 `.pi/command-cn-map.json`（`{ "命令名": "中文说明" }`）
+  - 同时 emit `command-chinese:commands-updated` 事件供其他扩展监听补充
 
 ## 个人约定审查扩展（conventions-review）
 
