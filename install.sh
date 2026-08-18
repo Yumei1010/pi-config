@@ -1,9 +1,24 @@
 #!/bin/bash
+# Pi 开发环境一键安装（macOS/Linux）
+# 本仓库是 pi package：安装 = pi install 一条命令，依赖插件随包捆绑并由 lock 文件锁定版本。
+# 脚本额外负责：前置检查 + 旧版安装方式（复制时代）的幂等迁移。
 set -e
 
 echo "=== Pi 开发环境安装 ==="
 
-PACKAGES=(
+if ! command -v pi >/dev/null 2>&1; then
+  echo "错误：未找到 pi 命令，请先安装 pi（https://github.com/earendil-works/pi-coding-agent）。" >&2
+  exit 1
+fi
+
+GIT_SOURCE="git:github.com/Yumei1010/pi-config"
+EXT_DIR="$HOME/.pi/agent/extensions"
+
+# 本仓库提供的自定义插件（用于清理旧版复制副本）
+OWN_EXTENSIONS=(claude-md-loader command-chinese conventions-review minimal-statusline project-memory provider-switch)
+
+# 旧版单独安装的依赖包（现已随本包捆绑）
+LEGACY_PACKAGES=(
   "npm:pi-web-access"
   "npm:pi-mcp-adapter"
   "npm:@narumitw/pi-btw"
@@ -21,16 +36,55 @@ PACKAGES=(
   "npm:@narumitw/pi-wait-what"
 )
 
-for pkg in "${PACKAGES[@]}"; do
-  echo "安装: $pkg"
-  pi install "$pkg"
+# ── 1. 安装本包 ──────────────────────────────────────────
+if pi list 2>/dev/null | grep -q "Yumei1010/pi-config"; then
+  echo "本包已安装，跳过（更新请运行: pi update --extensions）"
+else
+  echo "安装: $GIT_SOURCE"
+  pi install "$GIT_SOURCE"
+fi
+
+# ── 2. 旧版迁移（幂等，新机器自动跳过）────────────────────
+migrate=0
+for d in "${OWN_EXTENSIONS[@]}"; do
+  [ -d "$EXT_DIR/$d" ] && migrate=1 && break
 done
+if [ "$migrate" = "0" ] && pi list 2>/dev/null | grep -q "@narumitw/pi-goal"; then migrate=1; fi
 
-# 安装自定义扩展（每个插件一个子目录，递归复制）
-EXT_DIR="$HOME/.pi/agent/extensions"
-mkdir -p "$EXT_DIR"
-cp -r "$(dirname "$0")/extensions/." "$EXT_DIR/"
-echo "自定义扩展已安装"
+if [ "$migrate" = "1" ]; then
+  echo "检测到旧版安装，开始迁移（避免重复加载）…"
 
-echo "=== 完成 ==="
-echo "运行 pi 然后输入 /reload"
+  # 2a) 移除单独安装的依赖包
+  for pkg in "${LEGACY_PACKAGES[@]}"; do
+    if pi remove "$pkg" >/dev/null 2>&1; then
+      echo "  移除旧依赖: $pkg"
+    fi
+  done
+
+  # 2b) 删除复制到 agent 目录的旧插件副本
+  for d in "${OWN_EXTENSIONS[@]}"; do
+    if [ -d "$EXT_DIR/$d" ]; then
+      rm -rf "$EXT_DIR/$d"
+      echo "  清理旧插件副本: $d"
+    fi
+  done
+
+  # 2c) 清理 settings.json 中旧版平铺插件条目（仅移除本仓库的 6 个，保留其他）
+  node -e '
+    const fs = require("fs"), path = require("path"), os = require("os");
+    const p = path.join(os.homedir(), ".pi", "agent", "settings.json");
+    try {
+      const s = JSON.parse(fs.readFileSync(p, "utf8"));
+      if (!Array.isArray(s.extensions)) process.exit(0);
+      const stale = new Set(["claude-md-loader.ts", "command-chinese.ts", "conventions-review.ts", "minimal-statusline.ts", "project-memory.ts", "provider-switch.ts"]);
+      const kept = s.extensions.filter((e) => !stale.has(String(e).replace(/\\/g, "/").split("/").pop()));
+      if (kept.length !== s.extensions.length) {
+        s.extensions = kept;
+        fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
+        console.log("  已清理 settings.json 旧插件条目");
+      }
+    } catch {}
+  '
+fi
+
+echo "=== 完成 === 运行 pi 然后输入 /reload"

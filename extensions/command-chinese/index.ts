@@ -12,7 +12,7 @@
  *    - 仍无法汉化的新指令会一次性提示，可在用户配置文件中补充
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -114,7 +114,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   // ── 自动汉化钩子：检测新指令并采纳中文说明 ────────────────
-  async function checkNewCommands(ctx: { cwd: string; ui: { notify: (msg: string, level?: string) => void } }) {
+  async function checkNewCommands(ctx: Pick<ExtensionContext, "cwd" | "ui">) {
     try {
       const commands = pi.getCommands();
       const news = commands.filter((c) => !known.has(c.name));

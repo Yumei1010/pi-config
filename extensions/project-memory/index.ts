@@ -220,7 +220,8 @@ async function git(args: string[], cwd: string): Promise<{ code: number; stdout:
       args,
       { cwd, maxBuffer: 10 * 1024 * 1024, timeout: 120_000 },
       (err, stdout, stderr) => {
-        resolve({ code: err ? (err as NodeJS.ErrnoException).code ?? 1 : 0, stdout: stdout || "", stderr: stderr || "" });
+        const rawCode = (err as { code?: unknown } | null)?.code;
+        resolve({ code: err ? (typeof rawCode === "number" ? rawCode : 1) : 0, stdout: stdout || "", stderr: stderr || "" });
       },
     );
   });
@@ -578,19 +579,19 @@ export default function (pi: ExtensionAPI) {
           }
           const prev = await loadCloudConfig();
           await saveCloudConfig({ repoUrl, autoSync: prev?.autoSync ?? false });
-          ctx.ui.notify(`已配置云端记忆仓库：${repoUrl}\n首次推送请运行 /memory cloud push（私有仓库需已配置 git 凭据/代理）`, "success");
+          ctx.ui.notify(`已配置云端记忆仓库：${repoUrl}\n首次推送请运行 /memory cloud push（私有仓库需已配置 git 凭据/代理）`, "info");
           return;
         }
         if (sub === "push" || sub === "sync") {
           ctx.ui.notify("正在推送记忆到云端…", "info");
           const result = await cloudPush(ctx.cwd);
-          ctx.ui.notify(result.message, result.ok ? "success" : "error");
+          ctx.ui.notify(result.message, result.ok ? "info" : "error");
           return;
         }
         if (sub === "pull") {
           ctx.ui.notify("正在从云端拉取记忆…", "info");
           const result = await cloudPull(ctx.cwd);
-          ctx.ui.notify(result.message, result.ok ? "success" : "error");
+          ctx.ui.notify(result.message, result.ok ? "info" : "error");
           return;
         }
         if (sub === "status") {
@@ -601,7 +602,7 @@ export default function (pi: ExtensionAPI) {
           const config = await loadCloudConfig();
           if (!config) { ctx.ui.notify("未配置云端仓库。先运行 /memory cloud set <URL>", "error"); return; }
           await saveCloudConfig({ ...config, autoSync: true });
-          ctx.ui.notify("自动推送已开启：记忆变化后自动同步到云端。", "success");
+          ctx.ui.notify("自动推送已开启：记忆变化后自动同步到云端。", "info");
           return;
         }
         if (sub === "off") {

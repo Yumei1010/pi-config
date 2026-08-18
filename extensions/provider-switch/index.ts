@@ -191,7 +191,7 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.notify(`切换失败：${provider}/${modelId} 没有可用的 API Key`, "error");
         return;
       }
-      ctx.ui.notify(`已切换到 ${provider}/${modelId}`, "success");
+      ctx.ui.notify(`已切换到 ${provider}/${modelId}`, "info");
     },
   });
 }
