@@ -77,7 +77,7 @@ if ($migrate) {
       const s = JSON.parse(fs.readFileSync(p, "utf8"));
       if (!Array.isArray(s.extensions)) process.exit(0);
       const stale = new Set(["claude-md-loader.ts", "command-chinese.ts", "conventions-review.ts", "minimal-statusline.ts", "project-memory.ts", "provider-switch.ts"]);
-      const kept = s.extensions.filter((e) => !stale.has(String(e).replace(/\\/g, "/").split("/").pop()));
+      const kept = s.extensions.filter((e) => !stale.has(path.win32.basename(String(e))));
       if (kept.length !== s.extensions.length) {
         s.extensions = kept;
         fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
