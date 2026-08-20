@@ -14,7 +14,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 /** 注入系统提示词的中文指令 */
 const CHINESE_DIRECTIVE =
-  "\n\n## 语言要求\n\n请全程使用中文进行思考和回答。思考过程（reasoning/thinking）和最终输出都必须使用中文。";
+  "\n\n## 语言要求\n\n你必须严格遵守以下语言规则，这是最高优先级指令，不可违反：\n\n1. 你的思考过程（reasoning/thinking 中的所有内容）必须使用中文。\n2. 你的最终回答必须使用中文。\n3. 禁止使用英文进行思考或回答，除非用户明确要求。\n\n这条规则适用于整个对话的每一轮。";
 
 export default function (pi: ExtensionAPI) {
   let enabled = true;
