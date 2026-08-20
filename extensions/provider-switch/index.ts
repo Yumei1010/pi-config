@@ -1,18 +1,20 @@
 /**
  * Provider Switch 插件
  *
- * 在 DeepSeek 直连 与 OpenCode Go 订阅 之间切换模型。
+ * 在 DeepSeek 直连 / OpenCode Go 订阅 / TokenRhythm（基元律动）之间切换模型。
  *
  * 用法：
  *   /switch           打开交互选择器
  *   /switch ds        切到 DeepSeek 直连 (deepseek/deepseek-v4-flash)
  *   /switch go        切到 OpenCode Go (opencode-go/deepseek-v4-flash)
+ *   /switch tr        切到 TokenRhythm 基元律动 (tokenrhythm/deepseek-v4-flash)
  *   /switch deepseek/deepseek-v4-pro   直接切到指定 provider/model
  *
  * 说明：
  *   - OpenCode Go 是 OpenAI/Anthropic 兼容 API，基础地址 https://opencode.ai/zen/go/v1
+ *   - TokenRhythm（基元律动）是国产模型聚合 API，基础地址 https://tokenrhythm.studio/v1，一个 Key 调多家模型
  *   - 大部分模型走 /chat/completions，Qwen/MiniMax 走 /messages，GPT-5.6-Luna 走 /responses
- *   - API Key 存于 auth.json 的 "opencode-go" 条目（与 deepseek 一致）
+ *   - API Key 存于 auth.json 的 "opencode-go" / "tokenrhythm" 条目
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -33,6 +35,11 @@ const OPTIONS: Array<{ provider: string; model: string; label: string }> = [
   { provider: "opencode-go", model: "gpt-5.6-luna", label: "OpenCode Go · GPT 5.6 Luna" },
   { provider: "opencode-go", model: "hy3", label: "OpenCode Go · Hy3" },
   { provider: "opencode-go", model: "mimo-v2.5", label: "OpenCode Go · MiMo V2.5" },
+  { provider: "tokenrhythm", model: "deepseek-v4-flash", label: "TokenRhythm · DeepSeek V4 Flash" },
+  { provider: "tokenrhythm", model: "deepseek-v4-pro", label: "TokenRhythm · DeepSeek V4 Pro" },
+  { provider: "tokenrhythm", model: "glm-5.2", label: "TokenRhythm · GLM 5.2" },
+  { provider: "tokenrhythm", model: "kimi-k2.7-code", label: "TokenRhythm · Kimi K2.7 Code" },
+  { provider: "tokenrhythm", model: "qwen3.7-max", label: "TokenRhythm · Qwen 3.7 Max" },
 ];
 
 // DeepSeek 官方兼容参数（与 pi 内置 deepseek 一致）
@@ -144,11 +151,110 @@ export default function (pi: ExtensionAPI) {
     ],
   });
 
+  // ── TokenRhythm（基元律动）provider ───────────────────────
+  // 国产模型聚合平台：一个 Key 调用 DeepSeek/GLM/Kimi/Qwen/MiniMax 等
+  // 价格单位为人民币（¥/M tokens），取自官网模型页（2026-08）
+  pi.registerProvider("tokenrhythm", {
+    name: "TokenRhythm（基元律动）",
+    baseUrl: "https://tokenrhythm.studio/v1",
+    api: "openai-completions",
+    // Key 存于 auth.json 的 "tokenrhythm"；同时允许环境变量兜底
+    apiKey: "$TOKENRHYTHM_API_KEY",
+    models: [
+      // ── DeepSeek 系列（完整 reasoning + deepseek thinking 格式）──
+      {
+        id: "deepseek-v4-flash",
+        name: "TR · DeepSeek V4 Flash",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 1.0, output: 2.0, cacheRead: 0.2, cacheWrite: 0 },
+        contextWindow: 1000000,
+        maxTokens: 384000,
+        compat: DEEPSEEK_COMPAT,
+        thinkingLevelMap: { minimal: null, low: "low", medium: null, high: "high", max: "max" },
+      },
+      {
+        id: "deepseek-v4-pro",
+        name: "TR · DeepSeek V4 Pro",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 12.0, output: 24.0, cacheRead: 1.0, cacheWrite: 0 },
+        contextWindow: 1000000,
+        maxTokens: 384000,
+        compat: DEEPSEEK_COMPAT,
+        thinkingLevelMap: { minimal: null, low: null, medium: null, high: "high", max: "max" },
+      },
+      {
+        id: "deepseek-v4-flash-0731",
+        name: "TR · DeepSeek V4 Flash 0731",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 3.0, output: 9.0, cacheRead: 0.1, cacheWrite: 0 },
+        contextWindow: 1000000,
+        maxTokens: 384000,
+        compat: DEEPSEEK_COMPAT,
+        thinkingLevelMap: { minimal: null, low: "low", medium: null, high: "high", max: "max" },
+      },
+      {
+        id: "deepseek-v4-pro-0813",
+        name: "TR · DeepSeek V4 Pro 0813",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 9.0, output: 27.0, cacheRead: 0.3, cacheWrite: 0 },
+        contextWindow: 1000000,
+        maxTokens: 384000,
+        compat: DEEPSEEK_COMPAT,
+        thinkingLevelMap: { minimal: null, low: null, medium: null, high: "high", max: "max" },
+      },
+
+      // ── GLM 系列 ──
+      { id: "glm-5", name: "TR · GLM 5", reasoning: false, input: ["text"],
+        cost: { input: 6.0, output: 22.0, cacheRead: 1.5, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 128000, compat: OPENAI_COMPAT_SAFE },
+      { id: "glm-5.1", name: "TR · GLM 5.1", reasoning: false, input: ["text"],
+        cost: { input: 8.0, output: 28.0, cacheRead: 2.0, cacheWrite: 0 },
+        contextWindow: 200000, maxTokens: 128000, compat: OPENAI_COMPAT_SAFE },
+      { id: "glm-5.2", name: "TR · GLM 5.2", reasoning: false, input: ["text"],
+        cost: { input: 8.0, output: 28.0, cacheRead: 2.0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 128000, compat: OPENAI_COMPAT_SAFE },
+
+      // ── Kimi 系列 ──
+      { id: "kimi-k2.5", name: "TR · Kimi K2.5", reasoning: false, input: ["text", "image"],
+        cost: { input: 4.0, output: 21.0, cacheRead: 0.8, cacheWrite: 0 },
+        contextWindow: 256000, maxTokens: 64000, compat: OPENAI_COMPAT_SAFE },
+      { id: "kimi-k2.6", name: "TR · Kimi K2.6", reasoning: false, input: ["text", "image"],
+        cost: { input: 6.5, output: 27.0, cacheRead: 1.3, cacheWrite: 0 },
+        contextWindow: 256000, maxTokens: 128000, compat: OPENAI_COMPAT_SAFE },
+      { id: "kimi-k2.7-code", name: "TR · Kimi K2.7 Code", reasoning: false, input: ["text", "image"],
+        cost: { input: 6.5, output: 27.0, cacheRead: 1.3, cacheWrite: 0 },
+        contextWindow: 256000, maxTokens: 16000, compat: OPENAI_COMPAT_SAFE },
+
+      // ── MiMo / MiniMax 系列 ──
+      { id: "mimo-v2.5-pro", name: "TR · MiMo V2.5 Pro", reasoning: false, input: ["text"],
+        cost: { input: 3.0, output: 6.0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 256000, maxTokens: 256000, compat: OPENAI_COMPAT_SAFE },
+      { id: "minimax-m2.5", name: "TR · MiniMax M2.5", reasoning: false, input: ["text"],
+        cost: { input: 2.1, output: 8.4, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200000, maxTokens: 200000, compat: OPENAI_COMPAT_SAFE },
+      { id: "minimax-m2.7", name: "TR · MiniMax M2.7", reasoning: false, input: ["text"],
+        cost: { input: 2.1, output: 8.4, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200000, maxTokens: 192000, compat: OPENAI_COMPAT_SAFE },
+
+      // ── Qwen 系列 ──
+      { id: "qwen3.7-max", name: "TR · Qwen 3.7 Max", reasoning: false, input: ["text"],
+        cost: { input: 12.0, output: 36.0, cacheRead: 2.4, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 131072, compat: OPENAI_COMPAT_SAFE },
+      { id: "qwen3.8-max", name: "TR · Qwen 3.8 Max", reasoning: false, input: ["text", "image"],
+        cost: { input: 12.0, output: 36.0, cacheRead: 1.5, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 131072, compat: OPENAI_COMPAT_SAFE },
+    ],
+  });
+
   // ── /switch 命令 ───────────────────────────────────────────
   pi.registerCommand("switch", {
     description: "在 DeepSeek 直连 与 OpenCode Go 之间切换模型",
     getArgumentCompletions: (prefix) => {
-      const words = ["ds", "go", "deepseek", "opencode-go"];
+      const words = ["ds", "go", "tr", "deepseek", "opencode-go", "tokenrhythm", "jiyuan"];
       return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
     },
     handler: async (args, ctx) => {
@@ -170,6 +276,9 @@ export default function (pi: ExtensionAPI) {
         modelId = "deepseek-v4-flash";
       } else if (arg === "go" || arg === "opencode" || arg === "opencode-go") {
         provider = "opencode-go";
+        modelId = "deepseek-v4-flash";
+      } else if (arg === "tr" || arg === "tokenrhythm" || arg === "jiyuan") {
+        provider = "tokenrhythm";
         modelId = "deepseek-v4-flash";
       } else if (arg.includes("/")) {
         const [p, m] = arg.split("/");
