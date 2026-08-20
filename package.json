@@ -32,6 +32,9 @@
     ],
     "skills": [
       "node_modules/pi-mcp-adapter/skills"
+    ],
+    "themes": [
+      "themes"
     ]
   },
   "dependencies": {

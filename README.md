@@ -44,6 +44,22 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 依赖版本在 `package.json` 中精确锁定。升级方式：改版本号 → `npm install` → 提交推送 → 各机器执行 `pi update --extensions`。
 
+## 个人主题
+
+仓库自带 **yumei** 主题（`themes/`，深蓝低饱和底 + 内容区块色块划分）。启用：
+
+```bash
+# settings.json 中设置，或 /settings 里选
+"theme": "yumei"
+```
+
+主题特色：
+
+- **工具三态色块**：pending（中/blu） / success（暗绿） / error（暗红）底色区分
+- **用户消息 / 扩展消息色块**：与正文背景区分开
+- **代码块**：亮绿内容 + 淡边框（因"pi 无代码块背景 token"，用边框模拟模块感）+ 亮青 inline code
+- **思考区**：`thinkingText` 用次级文字色，6 档 thinking 边界色阶（低→高）
+
 ## 按需开关
 
 ```bash

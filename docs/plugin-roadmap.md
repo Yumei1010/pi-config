@@ -104,3 +104,4 @@
 | 2    | 模型数据自动同步 | ✅ 实现：/sync-models 命令，fetch GET /v1/models 动态注册 | 2026-08-20 |
 | 3    | 指令语义审查 | ✅ 审查 16 插件全部指令：search/websearch/genai 同名异功能，switch 超集 model，sync/sync-models 最易混淆（靠汉化描述区分）；发现 subagents 被注册两次（先注册者胜） | 2026-08-20 |
 | 4    | command-chinese 二级/三级汉化 | ✅ 新增 SUB_CN_MAP 90+ 条组合映射，补全支持多级回退匹配，/all 展示子命令说明 | 2026-08-20 |
+| 5    | 个人主题 | ✅ 实现 themes/yumei.json：深蓝低饱和底 + 内容区块色块划分（工具三态/用户/扩展消息色块，代码块边框模拟，思考边界色阶）。注：pi 无代码块/思考背景 token，代码块用边框+亮色模拟 | 2026-08-20 |
