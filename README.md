@@ -1,6 +1,6 @@
 # Pi 开发环境配置
 
-本仓库是一个 **pi package**：6 个自定义插件 + 15 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
+本仓库是一个 **pi package**：7 个自定义插件 + 15 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
 
 ## 安装
 
@@ -35,6 +35,7 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 | **project-memory** | 两级记忆知识库 + GitHub 私有仓库云同步 | [README](extensions/project-memory/README.md) |
 | **conventions-review** | 个人 GFramework 代码规范审查 | [README](extensions/conventions-review/README.md) |
 | **command-chinese** | 指令说明汉化 + /all 指令一览 | [README](extensions/command-chinese/README.md) |
+| **session-auto-name** | 自动提取首条消息作为会话名称 | [README](extensions/session-auto-name/README.md) |
 
 ## 捆绑依赖插件
 
