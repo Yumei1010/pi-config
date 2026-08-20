@@ -250,9 +250,125 @@ export default function (pi: ExtensionAPI) {
     ],
   });
 
+  // ── /sync-models 命令 ──────────────────────────────────────
+  // 从 TokenRhythm API 拉取最新模型列表，动态更新 provider 注册
+  pi.registerCommand("sync-models", {
+    description: "从 TokenRhythm API 同步最新模型数据",
+    getArgumentCompletions: (prefix) => {
+      const words = ["tr", "tokenrhythm", "jiyuan"];
+      return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
+    },
+    handler: async (args, ctx) => {
+      const arg = args.trim().toLowerCase();
+      const provider = (!arg || arg === "tr" || arg === "tokenrhythm" || arg === "jiyuan")
+        ? "tokenrhythm"
+        : arg;
+
+      if (provider !== "tokenrhythm") {
+        ctx.ui.notify(`暂不支持同步 ${provider}，当前仅支持 tokenrhythm`, "error");
+        return;
+      }
+
+      ctx.ui.notify("正在从 TokenRhythm API 同步模型数据…", "info");
+
+      const apiKey = await ctx.modelRegistry.getApiKeyForProvider("tokenrhythm");
+      if (!apiKey) {
+        ctx.ui.notify("无法获取 TokenRhythm API Key，请检查 auth.json 或 TOKENRHYTHM_API_KEY 环境变量", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch("https://tokenrhythm.studio/v1/models", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) {
+          ctx.ui.notify(`API 请求失败 (${res.status})`, "error");
+          return;
+        }
+
+        const body = await res.json() as {
+          data: Array<{
+            id: string;
+            context_length: number;
+            max_completion_tokens: number;
+            supports_reasoning: boolean;
+            supports_vision: boolean;
+            pricing: {
+              prompt: string | null;
+              completion: string | null;
+              cache_read: string | null;
+            };
+          }>;
+        };
+
+        const models: Array<{
+          id: string;
+          name: string;
+          reasoning: boolean;
+          input: ("text" | "image")[];
+          cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+          contextWindow: number;
+          maxTokens: number;
+          compat?: typeof DEEPSEEK_COMPAT | typeof OPENAI_COMPAT_SAFE;
+          thinkingLevelMap?: Record<string, string | null>;
+        }> = [];
+
+        for (const m of body.data) {
+          const inPrice = parseFloat(m.pricing.prompt ?? "0");
+          const outPrice = parseFloat(m.pricing.completion ?? "0");
+          const cachePrice = parseFloat(m.pricing.cache_read ?? "0");
+
+          // 对话模型需要价格>0 否则跳过（如图片生成模型 qwen-image-2.0 等）
+          if (inPrice <= 0 && outPrice <= 0) continue;
+
+          const isDeepseek = m.id.startsWith("deepseek-");
+          const input: ("text" | "image")[] = m.supports_vision ? ["text", "image"] : ["text"];
+
+          const model: any = {
+            id: m.id,
+            name: "TR · " + m.id.split("-").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" "),
+            reasoning: isDeepseek,
+            input,
+            cost: {
+              input: inPrice,
+              output: outPrice,
+              cacheRead: cachePrice,
+              cacheWrite: 0,
+            },
+            contextWindow: m.context_length,
+            maxTokens: m.max_completion_tokens,
+          };
+
+          if (isDeepseek) {
+            model.compat = DEEPSEEK_COMPAT;
+            model.thinkingLevelMap = m.id.includes("pro")
+              ? { minimal: null, low: null, medium: null, high: "high", max: "max" }
+              : { minimal: null, low: "low", medium: null, high: "high", max: "max" };
+          } else {
+            model.compat = OPENAI_COMPAT_SAFE;
+          }
+
+          models.push(model);
+        }
+
+        pi.registerProvider("tokenrhythm", {
+          name: "TokenRhythm（基元律动）",
+          baseUrl: "https://tokenrhythm.studio/v1",
+          api: "openai-completions",
+          apiKey: "$TOKENRHYTHM_API_KEY",
+          models,
+        });
+
+        ctx.ui.notify(`同步完成：${models.length} 个模型已更新`, "info");
+      } catch (err) {
+        ctx.ui.notify(`同步失败: ${err instanceof Error ? err.message : String(err)}`, "error");
+      }
+    },
+  });
+
   // ── /switch 命令 ───────────────────────────────────────────
   pi.registerCommand("switch", {
-    description: "在 DeepSeek 直连 与 OpenCode Go 之间切换模型",
+    description: "在 DeepSeek 直连 / OpenCode Go / TokenRhythm 之间切换模型",
     getArgumentCompletions: (prefix) => {
       const words = ["ds", "go", "tr", "deepseek", "opencode-go", "tokenrhythm", "jiyuan"];
       return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
@@ -266,7 +382,7 @@ export default function (pi: ExtensionAPI) {
       if (arg === "" ) {
         // 交互选择
         const items = OPTIONS.map((o) => `${o.provider}/${o.model}  —  ${o.label}`);
-        const picked = await ctx.ui.select("切换模型（DeepSeek 直连 vs OpenCode Go）", items);
+        const picked = await ctx.ui.select("切换模型（DeepSeek 直连 vs OpenCode Go vs TokenRhythm）", items);
         if (!picked) return;
         const idx = items.indexOf(picked);
         provider = OPTIONS[idx].provider;
@@ -285,7 +401,7 @@ export default function (pi: ExtensionAPI) {
         provider = p;
         modelId = m;
       } else {
-        ctx.ui.notify(`未知参数 "${arg}"。用法: /switch [ds|go|provider/model]`, "error");
+        ctx.ui.notify(`未知参数 "${arg}"。用法: /switch [ds|go|tr|provider/model]`, "error");
         return;
       }
 

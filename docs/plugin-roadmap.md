@@ -6,15 +6,15 @@
 
 ## 已实现
 
-| 插件 | 状态 |
-|------|------|
-| claude-md-loader | ✅ 完成 |
-| minimal-statusline | ✅ 完成 |
-| provider-switch | ✅ 完成（含 TokenRhythm 基元律动） |
-| project-memory | ✅ 完成 |
-| conventions-review | ✅ 完成（C# GFramework） |
-| command-chinese | ✅ 完成 |
-| session-auto-name | ✅ 完成 |
+| 插件               | 状态                               |
+| ------------------ | ---------------------------------- |
+| claude-md-loader   | ✅ 完成                            |
+| minimal-statusline | ✅ 完成                            |
+| provider-switch    | ✅ 完成（含 TokenRhythm 基元律动） |
+| project-memory     | ✅ 完成                            |
+| conventions-review | ✅ 完成（C# GFramework）           |
+| command-chinese    | ✅ 完成                            |
+| session-auto-name  | ✅ 完成                            |
 
 ---
 
@@ -28,13 +28,13 @@
 
 **方案**：注册一组 `/xxx` 命令：
 
-| 命令 | 功能 |
-|------|------|
-| `/commit` | 分析 git diff（staged）生成 conventional commit 信息，确认后执行 |
-| `/review` | 审查当前代码变更（调用 conventions-review 逻辑） |
-| `/test` | 为选中代码生成单元测试 |
-| `/explain` | 解释选中代码 |
-| `/refactor` | 重构建议 |
+| 命令          | 功能                                                             |
+| ------------- | ---------------------------------------------------------------- |
+| `/commit`   | 分析 git diff（staged）生成 conventional commit 信息，确认后执行 |
+| `/review`   | 审查当前代码变更（调用 conventions-review 逻辑）                 |
+| `/test`     | 为选中代码生成单元测试                                           |
+| `/explain`  | 解释选中代码                                                     |
+| `/refactor` | 重构建议                                                         |
 
 **工作量**：每个 ~50 行 TS
 
@@ -66,6 +66,8 @@
 
 **文件**：`extensions/provider-switch/index.ts`（追加）
 
+**状态**：✅ 完成 - 2026-08-20
+
 ---
 
 ### P2 — 工程化
@@ -96,6 +98,7 @@
 
 ## 决策记录
 
-| 编号 | 项目 | 决策 | 日期 |
-|------|------|------|------|
-| 1 | 会话自动命名 | ✅ 实现：模型生成 ≤15 字标题，before_agent_start 时调用 ctx.modelRegistry.complete() | 2026-08-20 |
+| 编号 | 项目         | 决策                                                                                  | 日期       |
+| ---- | ------------ | ------------------------------------------------------------------------------------- | ---------- |
+| 1    | 会话自动命名 | ✅ 实现：模型生成 ≤15 字标题，before_agent_start 时调用 ctx.modelRegistry.complete() | 2026-08-20 |
+| 2    | 模型数据自动同步 | ✅ 实现：/sync-models 命令，fetch GET /v1/models 动态注册 | 2026-08-20 |

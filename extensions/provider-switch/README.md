@@ -11,6 +11,8 @@
 | `/switch go` | 切到 OpenCode Go（opencode-go/deepseek-v4-flash） |
 | `/switch tr` | 切到 TokenRhythm 基元律动（tokenrhythm/deepseek-v4-flash） |
 | `/switch deepseek/deepseek-v4-pro` | 直接切到指定 provider/model |
+| `/sync-models` | 从 TokenRhythm API 同步最新模型数据 |
+| `/sync-models tr` | 同上 |
 
 ## 支持的模型
 
