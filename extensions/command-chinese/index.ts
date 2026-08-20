@@ -73,6 +73,97 @@ const CN_MAP: Record<string, string> = {
   // 命令补全可能带 argumentHint（value 形如 "goal"），前缀匹配用
 };
 
+// ── 二级/三级指令（子命令/参数）→ 中文说明映射 ──────────────
+// 键为 "命令名 子命令"，补全候选/help 展示时据此汉化 description
+const SUB_CN_MAP: Record<string, string> = {
+  // goal 子命令
+  "goal pause": "暂停当前目标",
+  "goal resume": "恢复已停止/预算受限的目标",
+  "goal clear": "清除当前目标",
+  "goal edit": "编辑当前目标目标描述",
+  "goal status": "查看当前目标",
+  "goal add": "队尾添加新目标",
+  "goal prioritize": "队首优先新目标",
+  "goal drop-last": "移除最后一个目标",
+  "goal skip": "跳过当前目标",
+  // firecrawl 子命令
+  "firecrawl help": "查看命令用法",
+  "firecrawl config": "查看配置快速开始",
+  "firecrawl quickstart": "查看配置快速开始",
+  "firecrawl status": "查看工具与设置状态",
+  "firecrawl tools": "选择可加载的 Firecrawl 工具",
+  "firecrawl toggle": "选择可加载的 Firecrawl 工具（同 tools）",
+  "firecrawl enable": "启用全部 Firecrawl 工具",
+  "firecrawl disable": "停用全部 Firecrawl 工具",
+  // google-genai 子命令
+  "google-genai init": "创建/更新 Google GenAI 配置",
+  "google-genai status": "查看配置状态",
+  "google-genai config": "查看配置状态",
+  "google-genai help": "查看命令用法",
+  "google-genai tools": "选择 Google GenAI 工具",
+  "google-genai enable": "启用全部工具",
+  "google-genai disable": "停用全部工具",
+  // chrome-devtools 子命令
+  "chrome-devtools help": "查看命令用法",
+  "chrome-devtools quickstart": "查看连接与启动帮助",
+  "chrome-devtools status": "查看工具与设置状态",
+  "chrome-devtools settings": "编辑浏览器连接设置",
+  "chrome-devtools tools": "选择可加载的调试工具",
+  "chrome-devtools toggle": "选择可加载的调试工具（同 tools）",
+  "chrome-devtools select": "兼容别名（同 tools）",
+  "chrome-devtools enable": "启用全部调试工具",
+  "chrome-devtools on": "兼容别名（同 enable）",
+  "chrome-devtools disable": "停用全部调试工具",
+  "chrome-devtools off": "兼容别名（同 disable）",
+  // sync 子命令
+  "sync help": "查看命令用法",
+  "sync use": "切换当前同步配置",
+  "sync init": "创建本地配置模板",
+  "sync config": "查看解析后的配置",
+  "sync files": "选择纳入同步的内容",
+  "sync status": "查看同步状态",
+  "sync diff": "查看本地/远程差异",
+  "sync doctor": "检查配置/密钥/锁状态",
+  "sync push": "上传本地设置",
+  "sync pull": "应用远程设置",
+  "sync sync": "按需推送或拉取",
+  "sync history": "查看最近远程快照",
+  "sync rollback": "回滚到之前的快照",
+  "sync migrate-state": "迁移旧状态到 pi-sync/",
+  "sync unlock": "移除过期本地锁",
+  // subagents 子命令
+  "subagents settings": "配置子代理用户设置",
+  "subagents status": "查看生效的子代理设置",
+  "subagents help": "子代理设置帮助",
+  // memory 子命令
+  "memory global": "全局记忆（跨项目）",
+  "memory save": "保存当前记忆",
+  "memory clear": "清空项目记忆",
+  "memory clear-global": "清空全局记忆",
+  "memory cloud": "云同步管理",
+  "memory cloud set": "配置云同步仓库",
+  "memory cloud push": "推送记忆到云端",
+  "memory cloud pull": "从云端拉取记忆",
+  "memory cloud status": "云同步状态",
+  "memory cloud on": "开启云同步",
+  "memory cloud off": "关闭云同步",
+  // conventions 参数
+  "conventions --all": "审查全部未提交变更",
+  "conventions --staged": "审查已暂存变更",
+  // switch 参数
+  "switch ds": "切到 DeepSeek 直连",
+  "switch go": "切到 OpenCode Go",
+  "switch tr": "切到 TokenRhythm（基元律动）",
+  "switch deepseek": "切到 DeepSeek 直连",
+  "switch opencode-go": "切到 OpenCode Go",
+  "switch tokenrhythm": "切到 TokenRhythm（基元律动）",
+  "switch jiyuan": "切到 TokenRhythm（基元律动）",
+  // sync-models 参数
+  "sync-models tr": "同步 TokenRhythm 模型数据",
+  "sync-models tokenrhythm": "同步 TokenRhythm 模型数据",
+  "sync-models jiyuan": "同步 TokenRhythm 模型数据",
+};
+
 /** 尝试精确匹配或带 skill:/模板前缀的 name */
 function lookupCn(name: string): string | undefined {
   if (CN_MAP[name]) return CN_MAP[name];
@@ -93,6 +184,24 @@ const BUILTIN_NAMES = [
 
 const hasCjk = (s: string) => /[\u4e00-\u9fff]/.test(s);
 const baseName = (name: string) => name.replace(/:\d+$/, "");
+
+/** 从输入行提取当前正在补全的命令名（如 "/memory cloud" → "memory"） */
+function extractCurrentCommand(line: string): string | undefined {
+  const m = /^\s*\/([a-zA-Z0-9-]+)(?::\d+)?(?:\s|$)/.exec(line);
+  return m?.[1];
+}
+
+/** 查找子命令/参数的中文说明（支持多级，如 "memory cloud push" 逐级回退） */
+function lookupSubCn(cmdName: string, arg: string): string | undefined {
+  const parts = arg.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return undefined;
+  // 从最长组合开始逐级回退：memory cloud push → memory cloud → memory
+  for (let i = parts.length; i >= 1; i--) {
+    const cn = SUB_CN_MAP[`${cmdName} ${parts.slice(0, i).join(" ")}`];
+    if (cn) return cn;
+  }
+  return undefined;
+}
 
 export default function (pi: ExtensionAPI) {
   // 已知命令集合（用于检测新增指令）
@@ -169,8 +278,15 @@ export default function (pi: ExtensionAPI) {
       async getSuggestions(lines, line, col, options) {
         const base = await current.getSuggestions(lines, line, col, options);
         if (!base || base.items.length === 0) return base;
+        const currentLine = lines[line] ?? "";
+        const cmdName = extractCurrentCommand(currentLine);
         const items = base.items.map((item) => {
-          const raw = String(item.value ?? "");
+          const raw = String(item.value ?? "").trim();
+          // 子命令/参数补全（value 不带 "/"，如 "cloud push"）：查组合键
+          if (!raw.startsWith("/") && cmdName) {
+            const subCn = lookupSubCn(cmdName, raw);
+            if (subCn) return { ...item, description: subCn };
+          }
           const name = raw.replace(/^\//, "").replace(/:\d+$/, "");
           const cn = lookupCn(name);
           if (!cn) return item;
@@ -219,6 +335,12 @@ export default function (pi: ExtensionAPI) {
           const base = baseName(cmd.name);
           const cn = CN_MAP[base] ?? cmd.description ?? "";
           lines.push(`  /${cmd.name} — ${cn}`);
+          // 展示该命令的二级/三级指令中文说明
+          for (const [key, subCn] of Object.entries(SUB_CN_MAP)) {
+            if (key.startsWith(`${base} `)) {
+              lines.push(`    ${key.slice(base.length + 1)} — ${subCn}`);
+            }
+          }
         }
       }
       const templates = commands.filter((c) => c.source === "prompt");

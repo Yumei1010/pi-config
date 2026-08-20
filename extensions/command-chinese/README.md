@@ -5,8 +5,9 @@
 ## 功能
 
 1. **补全汉化**：输入 `/` 时，命令补全列表的每条说明替换为中文
-2. **`/all` 命令**：列出全部指令 + 中文说明一览（内置 + 扩展 + 模板 + skill）
-3. **自动汉化钩子**：检测到新增插件注册的新指令时自动处理
+2. **二级/三级指令汉化**：子命令/参数补全（如 `/goal pause`、`/memory cloud push`、`/sync use`）的说明也替换为中文，支持多级回退匹配
+3. **`/all` 命令**：列出全部指令 + 中文说明一览，并展示每个命令的二级/三级指令说明
+4. **自动汉化钩子**：检测到新增插件注册的新指令时自动处理
 
 ## 自动汉化钩子
 
@@ -22,4 +23,5 @@
 ## 说明
 
 - 内置映射 43+ 条（内置命令 + 本仓库扩展 + Narumiruna 插件 + web-access/mcp-adapter）
+- 二级/三级指令映射 90+ 条（goal/firecrawl/google-genai/chrome-devtools/sync/subagents/memory/conventions/switch/sync-models）
 - 内置 `/help` 与插件自身 UI 的英文描述由 pi/插件代码决定，扩展无法修改——补全和 `/all` 已覆盖
