@@ -48,7 +48,12 @@ export default function (pi: ExtensionAPI) {
     for (let i = msgs.length - 1; i >= 0; i--) {
       const m = msgs[i] as any;
       if (m.role === "user") {
-        m.content = (m.content ?? "") + contextBlock;
+        if (typeof m.content === "string") {
+          m.content += contextBlock;
+        } else if (Array.isArray(m.content)) {
+          // content 为数组（TextContent/ImageContent）时，push 一个 text 块
+          m.content.push({ type: "text", text: contextBlock });
+        }
         return { messages: msgs };
       }
     }
