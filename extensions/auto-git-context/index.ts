@@ -1,62 +1,44 @@
 /**
  * Git 上下文自动注入
  *
- * 在每次 LLM 调用前（context 事件），自动注入当前 git 变更状态
- * 到用户消息中，让 agent 直接知道改了哪些文件，无须额外询问。
+ * 在每轮对话启动时（before_agent_start），若工作区有未提交变更，
+ * 将变更摘要注入到系统提示词末尾，让 agent 直接了解当前改动。
  *
- * 与 claude-md-loader 互补：一个静态规范，一个实时变更。
+ * 设计要点（避免污染上下文）：
+ *   - 用 before_agent_start：每轮只触发一次，不会在工具循环中重复追加
+ *   - 注入系统提示词而非用户消息：不干扰用户真实指令
+ *   - 工作区无变更时跳过：不注入无关信息
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execSync } from "node:child_process";
 
 export default function (pi: ExtensionAPI) {
-  pi.on("context", async (event, ctx) => {
+  pi.on("before_agent_start", async (event) => {
     // 非 git 仓库跳过
-    const repoRoot = git(["rev-parse", "--show-toplevel"], ctx.cwd);
+    const repoRoot = git(["rev-parse", "--show-toplevel"], event.systemPromptOptions.cwd);
     if (!repoRoot) return;
 
-    const diffStat = git(["diff", "--stat"], ctx.cwd);
-    const diffName = git(["diff", "--name-only"], ctx.cwd);
-    const recentLog = git(["log", "--oneline", "-3"], ctx.cwd);
+    const diffStat = git(["diff", "--stat"], event.systemPromptOptions.cwd);
+    if (!diffStat) return; // 工作区干净，不注入
 
-    // 无变更且最近提交为空时跳过
-    if (!diffStat && !recentLog) return;
+    const diffName = git(["diff", "--name-only"], event.systemPromptOptions.cwd);
 
-    const lines: string[] = ["## 当前 Git 变更\n"];
-    if (diffStat) {
-      lines.push("未提交变更：");
-      lines.push("```\n" + diffStat + "\n```");
-    } else {
-      lines.push("工作区干净，无未提交变更。");
-    }
+    const lines: string[] = ["## 当前工作区未提交变更（参考）", ""];
+    lines.push("```");
+    lines.push(diffStat);
+    lines.push("```");
     if (diffName) {
       lines.push("\n涉及文件：");
       for (const f of diffName.split("\n").filter(Boolean)) {
         lines.push(`- \`${f}\``);
       }
     }
-    if (recentLog) {
-      lines.push("\n最近提交：");
-      lines.push("```\n" + recentLog + "\n```");
-    }
 
-    const contextBlock = "\n\n" + lines.join("\n");
-
-    // 将 git 上下文追加到最后一条用户消息
-    const msgs = event.messages;
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      const m = msgs[i] as any;
-      if (m.role === "user") {
-        if (typeof m.content === "string") {
-          m.content += contextBlock;
-        } else if (Array.isArray(m.content)) {
-          // content 为数组（TextContent/ImageContent）时，push 一个 text 块
-          m.content.push({ type: "text", text: contextBlock });
-        }
-        return { messages: msgs };
-      }
-    }
+    const block = "\n\n" + lines.join("\n");
+    // 避免重复注入（reload 或多次触发时）
+    if (event.systemPrompt.includes("## 当前工作区未提交变更")) return;
+    return { systemPrompt: event.systemPrompt + block };
   });
 }
 
