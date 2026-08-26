@@ -149,10 +149,10 @@ async function fetchCommandCodeQuota(): Promise<PlanQuota> {
   }
 }
 
-/** 按 provider 拉取对应订阅配额（带缓存） */
-async function fetchPlanQuota(provider: string): Promise<PlanQuota> {
+/** 按 provider 拉取对应订阅配额（带缓存；force 时强制刷新） */
+async function fetchPlanQuota(provider: string, force = false): Promise<PlanQuota> {
   const now = Date.now();
-  if (now - quotaFetchedAt < QUOTA_TTL_MS) {
+  if (!force && now - quotaFetchedAt < QUOTA_TTL_MS) {
     return provider === "opencode-go" ? goQuota : ccQuota;
   }
   const [go, cc] = await Promise.all([fetchOpenCodeGoQuota(), fetchCommandCodeQuota()]);
@@ -314,8 +314,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     scanHistory(ctx);
     render(ctx);
-    // 异步刷新订阅配额后重渲染（按当前 provider 取对应数据源）
-    await fetchPlanQuota(ctx.model?.provider ?? "");
+    // 每轮对话结束强制刷新订阅配额（绕过缓存），再重渲染
+    await fetchPlanQuota(ctx.model?.provider ?? "", true);
     render(ctx);
   });
 
