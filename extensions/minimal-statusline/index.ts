@@ -24,7 +24,7 @@ interface PlanQuota {
 let goQuota: PlanQuota = { fiveHour: undefined, weekly: undefined, monthly: undefined };
 let ccQuota: PlanQuota = { fiveHour: undefined, weekly: undefined, monthly: undefined };
 let quotaFetchedAt = 0;
-const QUOTA_TTL_MS = 60_000; // 60s 内不重复请求
+const QUOTA_TTL_MS = 30_000; // 30s 内不重复请求（配额更新更及时）
 
 /** 从 auth.json 读取 provider 的 API key 或 cookie */
 async function getAuthEntry(provider: string): Promise<{ key?: string; cookie?: string } | undefined> {
@@ -305,6 +305,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     scanHistory(ctx);
     render(ctx);
+    // 启动即异步拉取订阅配额（避免新会话显示旧值/空值）
+    void fetchPlanQuota(ctx.model?.provider ?? "").then(() => render(ctx));
   });
 
   // agent_end 时所有消息已持久化到 sessionManager（message_end 时 appendMessage），
