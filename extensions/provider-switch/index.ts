@@ -73,8 +73,7 @@ export default function (pi: ExtensionAPI) {
     name: "OpenCode Go",
     baseUrl: "https://opencode.ai/zen/go/v1",
     api: "openai-completions",
-    // Key 存于 auth.json 的 "opencode-go"；这里同时允许环境变量兜底
-    apiKey: "$OPENCODE_API_KEY",
+    // Key 走 auth.json 的 "opencode-go" 条目（不设 apiKey 避免 env 依赖）
     models: [
       // ── DeepSeek 系列（完整 reasoning + deepseek thinking 格式）──
       {
@@ -168,8 +167,7 @@ export default function (pi: ExtensionAPI) {
     name: "TokenRhythm（基元律动）",
     baseUrl: "https://tokenrhythm.studio/v1",
     api: "openai-completions",
-    // Key 存于 auth.json 的 "tokenrhythm"；同时允许环境变量兜底
-    apiKey: "$TOKENRHYTHM_API_KEY",
+    // Key 走 auth.json 的 "tokenrhythm" 条目（不设 apiKey 避免 env 依赖）
     models: [
       // ── DeepSeek 系列（完整 reasoning + deepseek thinking 格式）──
       {
@@ -268,8 +266,7 @@ export default function (pi: ExtensionAPI) {
     name: "Command Code (GOAT)",
     baseUrl: "https://api.commandcode.ai/provider/v1",
     api: "openai-completions",
-    // Key 存于 auth.json 的 "command-code"；同时允许环境变量兜底
-    apiKey: "$COMMAND_CODE_API_KEY",
+    // Key 走 auth.json 的 "command-code" 条目（不设 apiKey 避免 env 依赖）
     models: [
       // ── Claude 系列（Anthropic /messages 格式，原生 thinking）──
       { id: "claude-sonnet-5", name: "CC · Claude Sonnet 5", api: "anthropic-messages", reasoning: true, input: ["text"],
@@ -451,7 +448,6 @@ export default function (pi: ExtensionAPI) {
           name: "TokenRhythm（基元律动）",
           baseUrl: "https://tokenrhythm.studio/v1",
           api: "openai-completions",
-          apiKey: "$TOKENRHYTHM_API_KEY",
           models,
         });
 

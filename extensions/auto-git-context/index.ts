@@ -13,16 +13,21 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execSync } from "node:child_process";
 
+/** git 命令结果缓存（避免每轮重复执行，5s 内复用） */
+let gitCache: { key: string; at: number; value: string } | null = null;
+const GIT_CACHE_TTL_MS = 5_000;
+
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event) => {
+    const cwd = event.systemPromptOptions.cwd;
     // 非 git 仓库跳过
-    const repoRoot = git(["rev-parse", "--show-toplevel"], event.systemPromptOptions.cwd);
+    const repoRoot = git(["rev-parse", "--show-toplevel"], cwd);
     if (!repoRoot) return;
 
-    const diffStat = git(["diff", "--stat"], event.systemPromptOptions.cwd);
+    const diffStat = git(["diff", "--stat"], cwd);
     if (!diffStat) return; // 工作区干净，不注入
 
-    const diffName = git(["diff", "--name-only"], event.systemPromptOptions.cwd);
+    const diffName = git(["diff", "--name-only"], cwd);
 
     const lines: string[] = ["## 当前工作区未提交变更（参考）", ""];
     lines.push("```");
@@ -42,10 +47,17 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-/** 在项目目录下执行 git 命令，失败返回空字符串 */
+/** 在项目目录下执行 git 命令（带缓存），失败返回空字符串 */
 function git(args: string[], cwd: string): string {
+  const key = cwd + "|" + args.join(" ");
+  const now = Date.now();
+  if (gitCache && gitCache.key === key && now - gitCache.at < GIT_CACHE_TTL_MS) {
+    return gitCache.value;
+  }
   try {
-    return execSync("git " + args.join(" "), { cwd, encoding: "utf-8", timeout: 3000 }).trim();
+    const value = execSync("git " + args.join(" "), { cwd, encoding: "utf-8", timeout: 3000 }).trim();
+    gitCache = { key, at: now, value };
+    return value;
   } catch {
     return "";
   }
