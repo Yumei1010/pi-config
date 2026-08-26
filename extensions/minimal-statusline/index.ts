@@ -20,8 +20,9 @@ interface PlanQuota {
   monthly: number | undefined;
 }
 
-/** OpenCode Go + Command Code 订阅配额 */
-let planQuota: PlanQuota = { fiveHour: undefined, weekly: undefined, monthly: undefined };
+/** 各 provider 独立的订阅配额缓存 */
+let goQuota: PlanQuota = { fiveHour: undefined, weekly: undefined, monthly: undefined };
+let ccQuota: PlanQuota = { fiveHour: undefined, weekly: undefined, monthly: undefined };
 let quotaFetchedAt = 0;
 const QUOTA_TTL_MS = 60_000; // 60s 内不重复请求
 
@@ -145,19 +146,17 @@ async function fetchCommandCodeQuota(): Promise<PlanQuota> {
   }
 }
 
-/** 带缓存拉取当前订阅配额 */
-async function fetchPlanQuota(): Promise<PlanQuota> {
+/** 按 provider 拉取对应订阅配额（带缓存） */
+async function fetchPlanQuota(provider: string): Promise<PlanQuota> {
   const now = Date.now();
-  if (now - quotaFetchedAt < QUOTA_TTL_MS) return planQuota;
+  if (now - quotaFetchedAt < QUOTA_TTL_MS) {
+    return provider === "opencode-go" ? goQuota : ccQuota;
+  }
   const [go, cc] = await Promise.all([fetchOpenCodeGoQuota(), fetchCommandCodeQuota()]);
-  // 按当前 provider 取对应数据：合并两个数据源，无值的一侧保持 undefined
-  planQuota = {
-    fiveHour: go.fiveHour !== undefined ? go.fiveHour : cc.fiveHour,
-    weekly: go.weekly !== undefined ? go.weekly : cc.weekly,
-    monthly: go.monthly !== undefined ? go.monthly : cc.monthly,
-  };
+  goQuota = go;
+  ccQuota = cc;
   quotaFetchedAt = now;
-  return planQuota;
+  return provider === "opencode-go" ? goQuota : ccQuota;
 }
 
 /** 根据百分比选色（状态栏色阶） */
@@ -275,7 +274,8 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    const q = planQuota;
+    // 按当前 provider 取对应配额（go 显示 opencode，cc 显示 command code）
+    const q = prov === "opencode-go" ? goQuota : ccQuota;
     const parts: string[] = [];
     if (q.fiveHour !== undefined) {
       parts.push(t.fg(pctColor(q.fiveHour), `5h ${q.fiveHour}%`));
@@ -309,9 +309,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     scanHistory(ctx);
     render(ctx);
-    // 异步刷新订阅配额后重渲染
-    const q = await fetchPlanQuota();
-    planQuota = q;
+    // 异步刷新订阅配额后重渲染（按当前 provider 取对应数据源）
+    await fetchPlanQuota(ctx.model?.provider ?? "");
     render(ctx);
   });
 
