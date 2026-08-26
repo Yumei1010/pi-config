@@ -53,10 +53,10 @@ export default function (pi: ExtensionAPI) {
 
     if (tags.length === 0) return;
 
-    // 为当前叶子节点设置标签（取第一个匹配为主标签）
+    // 为当前叶子节点设置标签；多标签用 + 合并（如 git+refactor），保留全部信息
     const leafId = ctx.sessionManager.getLeafId();
     if (leafId) {
-      pi.setLabel(leafId, tags[0]);
+      pi.setLabel(leafId, [...new Set(tags)].join("+"));
     }
   });
 }

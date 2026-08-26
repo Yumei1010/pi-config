@@ -123,23 +123,36 @@ function changesPath(cwd: string): string {
   return join(cwd, CONFIG_DIR_NAME, CHANGES_FILE);
 }
 
+// 文件读取缓存：避免每轮 before_agent_start 重复读文件（5s TTL）
+const readCache = new Map<string, { at: number; value: string }>();
+const READ_CACHE_TTL_MS = 5_000;
+
 async function readText(file: string): Promise<string> {
-  try {
-    return await readFile(file, "utf-8");
-  } catch {
-    return "";
+  const cached = readCache.get(file);
+  if (cached && Date.now() - cached.at < READ_CACHE_TTL_MS) {
+    return cached.value;
   }
+  let value = "";
+  try {
+    value = await readFile(file, "utf-8");
+  } catch {
+    value = "";
+  }
+  readCache.set(file, { at: Date.now(), value });
+  return value;
 }
 
 async function writeText(file: string, content: string): Promise<void> {
   const dir = join(file, "..");
   await mkdir(dir, { recursive: true });
   await writeFile(file, content, "utf-8");
+  // 写入后使缓存失效，下次读取拿到最新内容
+  readCache.delete(file);
 }
 
 async function readChanges(cwd: string): Promise<ChangeRecord[]> {
   try {
-    const parsed = JSON.parse(await readFile(changesPath(cwd), "utf-8"));
+    const parsed = JSON.parse(await readText(changesPath(cwd)));
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

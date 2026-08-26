@@ -66,7 +66,12 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  pi.on("before_agent_start", async (event) => {
+  pi.on("before_agent_start", async (event, ctx) => {
+    // 每次会话启动前重载 CLAUDE.md（内容变化自动生效；文件读取走 OS 缓存，代价小）
+    const fresh = loadClaudeMd(ctx.cwd);
+    if (fresh !== claudeMdContent) {
+      claudeMdContent = fresh;
+    }
     if (!claudeMdContent) return;
 
     // 注入到系统提示词末尾
