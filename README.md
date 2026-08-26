@@ -31,7 +31,7 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 |------|------|------|
 | **claude-md-loader** | 自动加载 CLAUDE.md 注入系统提示词 | [README](extensions/claude-md-loader/README.md) |
 | **minimal-statusline** | 极简多彩状态栏（模型/上下文/Token/费用） | [README](extensions/minimal-statusline/README.md) |
-| **provider-switch** | DeepSeek 直连 / OpenCode Go 模型切换 | [README](extensions/provider-switch/README.md) |
+| **provider-switch** | DeepSeek / OpenCode Go / TokenRhythm / Command Code 模型切换 | [README](extensions/provider-switch/README.md) |
 | **project-memory** | 两级记忆知识库 + GitHub 私有仓库云同步 | [README](extensions/project-memory/README.md) |
 | **conventions-review** | 个人 GFramework 代码规范审查 | [README](extensions/conventions-review/README.md) |
 | **command-chinese** | 指令说明汉化 + /all 指令一览 | [README](extensions/command-chinese/README.md) |
@@ -70,7 +70,7 @@ pi config   # TUI 中启用/禁用包内单个插件，Tab 切换全局/项目�
 
 ## 认证配置
 
-- **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`（否则 `/switch go` 会提示没有可用 Key）
+- **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`；Command Code 为 `command-code` 条目 / `COMMAND_CODE_API_KEY`（否则 `/switch go|cc` 会提示没有可用 Key）
 - **project-memory 云同步**：私有仓库需已配置 git 凭据/代理
 
 ## 开发本仓库

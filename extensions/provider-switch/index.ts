@@ -40,6 +40,16 @@ const OPTIONS: Array<{ provider: string; model: string; label: string }> = [
   { provider: "tokenrhythm", model: "glm-5.2", label: "TokenRhythm · GLM 5.2" },
   { provider: "tokenrhythm", model: "kimi-k2.7-code", label: "TokenRhythm · Kimi K2.7 Code" },
   { provider: "tokenrhythm", model: "qwen3.7-max", label: "TokenRhythm · Qwen 3.7 Max" },
+  { provider: "command-code", model: "claude-sonnet-5", label: "Command Code · Claude Sonnet 5" },
+  { provider: "command-code", model: "deepseek/deepseek-v4-pro", label: "Command Code · DeepSeek V4 Pro" },
+  { provider: "command-code", model: "deepseek/deepseek-v4-flash", label: "Command Code · DeepSeek V4 Flash" },
+  { provider: "command-code", model: "moonshotai/Kimi-K3", label: "Command Code · Kimi K3" },
+  { provider: "command-code", model: "moonshotai/Kimi-K2.7-Code", label: "Command Code · Kimi K2.7 Code" },
+  { provider: "command-code", model: "zai-org/GLM-5.3", label: "Command Code · GLM 5.3" },
+  { provider: "command-code", model: "Qwen/Qwen3.8-Max", label: "Command Code · Qwen 3.8 Max" },
+  { provider: "command-code", model: "xai/grok-4.6", label: "Command Code · Grok 4.6" },
+  { provider: "command-code", model: "google/gemini-3.7-flash", label: "Command Code · Gemini 3.7 Flash" },
+  { provider: "command-code", model: "MiniMaxAI/MiniMax-M3", label: "Command Code · MiniMax M3" },
 ];
 
 // DeepSeek 官方兼容参数（与 pi 内置 deepseek 一致）
@@ -250,6 +260,92 @@ export default function (pi: ExtensionAPI) {
     ],
   });
 
+  // ── Command Code（GOAT 套餐）provider ────────────────────
+  // 订阅制：$10/月 30+ 模型（Claude/GPT/Gemini/DeepSeek/Kimi/GLM/Qwen 等）
+  // 端点 https://api.commandcode.ai/provider/v1，OpenAI/Anthropic 双兼容
+  // Claude 系列走 /messages（Anthropic 原生），其余走 /chat/completions
+  pi.registerProvider("command-code", {
+    name: "Command Code (GOAT)",
+    baseUrl: "https://api.commandcode.ai/provider/v1",
+    api: "openai-completions",
+    // Key 存于 auth.json 的 "command-code"；同时允许环境变量兜底
+    apiKey: "$COMMAND_CODE_API_KEY",
+    models: [
+      // ── Claude 系列（Anthropic /messages 格式，原生 thinking）──
+      { id: "claude-sonnet-5", name: "CC · Claude Sonnet 5", api: "anthropic-messages", reasoning: true, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 65536 },
+      { id: "claude-opus-5", name: "CC · Claude Opus 5", api: "anthropic-messages", reasoning: true, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 65536 },
+      { id: "claude-haiku-4-5-20251001", name: "CC · Claude Haiku 4.5", api: "anthropic-messages", reasoning: true, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200000, maxTokens: 32768 },
+
+      // ── GPT 系列 ──
+      { id: "gpt-5.6-luna", name: "CC · GPT-5.6 Luna", reasoning: true, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1050000, maxTokens: 32768 },
+      { id: "gpt-5.6-sol", name: "CC · GPT-5.6 Sol", reasoning: true, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1050000, maxTokens: 32768 },
+      { id: "gpt-5.5", name: "CC · GPT-5.5", reasoning: true, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 400000, maxTokens: 32768 },
+
+      // ── DeepSeek 系列 ──
+      { id: "deepseek/deepseek-v4-pro", name: "CC · DeepSeek V4 Pro", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 384000, compat: OPENAI_COMPAT_SAFE },
+      { id: "deepseek/deepseek-v4-flash", name: "CC · DeepSeek V4 Flash", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 384000, compat: OPENAI_COMPAT_SAFE },
+
+      // ── Kimi 系列 ──
+      { id: "moonshotai/Kimi-K3", name: "CC · Kimi K3", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+      { id: "moonshotai/Kimi-K2.7-Code", name: "CC · Kimi K2.7 Code", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 256000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+
+      // ── GLM 系列 ──
+      { id: "zai-org/GLM-5.3", name: "CC · GLM 5.3", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+      { id: "zai-org/GLM-5.2", name: "CC · GLM 5.2", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+
+      // ── Qwen 系列 ──
+      { id: "Qwen/Qwen3.8-Max", name: "CC · Qwen 3.8 Max", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+      { id: "Qwen/Qwen3.7-Max", name: "CC · Qwen 3.7 Max", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+
+      // ── MiniMax / MiMo ──
+      { id: "MiniMaxAI/MiniMax-M3", name: "CC · MiniMax M3", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+      { id: "xiaomi/mimo-v2.5-pro", name: "CC · MiMo V2.5 Pro", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+
+      // ── Gemini / Grok / Hy3 ──
+      { id: "google/gemini-3.7-flash", name: "CC · Gemini 3.7 Flash", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1048576, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+      { id: "xai/grok-4.6", name: "CC · Grok 4.6", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 500000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+      { id: "tencent/hy3-paid", name: "CC · Tencent Hy3", reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 262144, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
+    ],
+  });
+
   // ── /sync-models 命令 ──────────────────────────────────────
   // 从 TokenRhythm API 拉取最新模型列表，动态更新 provider 注册
   pi.registerCommand("sync-models", {
@@ -368,9 +464,9 @@ export default function (pi: ExtensionAPI) {
 
   // ── /switch 命令 ───────────────────────────────────────────
   pi.registerCommand("switch", {
-    description: "在 DeepSeek 直连 / OpenCode Go / TokenRhythm 之间切换模型",
+    description: "在 DeepSeek 直连 / OpenCode Go / TokenRhythm / Command Code 之间切换模型",
     getArgumentCompletions: (prefix) => {
-      const words = ["ds", "go", "tr", "deepseek", "opencode-go", "tokenrhythm", "jiyuan"];
+      const words = ["ds", "go", "tr", "cc", "deepseek", "opencode-go", "tokenrhythm", "command-code"];
       return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
     },
     handler: async (args, ctx) => {
@@ -382,7 +478,7 @@ export default function (pi: ExtensionAPI) {
       if (arg === "" ) {
         // 交互选择
         const items = OPTIONS.map((o) => `${o.provider}/${o.model}  —  ${o.label}`);
-        const picked = await ctx.ui.select("切换模型（DeepSeek 直连 vs OpenCode Go vs TokenRhythm）", items);
+        const picked = await ctx.ui.select("切换模型（DeepSeek vs Go vs TR vs CC）", items);
         if (!picked) return;
         const idx = items.indexOf(picked);
         provider = OPTIONS[idx].provider;
@@ -396,12 +492,16 @@ export default function (pi: ExtensionAPI) {
       } else if (arg === "tr" || arg === "tokenrhythm" || arg === "jiyuan") {
         provider = "tokenrhythm";
         modelId = "deepseek-v4-flash";
+      } else if (arg === "cc" || arg === "command-code" || arg === "goat") {
+        provider = "command-code";
+        modelId = "deepseek/deepseek-v4-flash";
       } else if (arg.includes("/")) {
-        const [p, m] = arg.split("/");
-        provider = p;
-        modelId = m;
+        // 用 indexOf 只拆第一个斜杠，模型 id 本身可能含斜杠（如 deepseek/deepseek-v4-flash）
+        const idx = arg.indexOf("/");
+        provider = arg.slice(0, idx);
+        modelId = arg.slice(idx + 1);
       } else {
-        ctx.ui.notify(`未知参数 "${arg}"。用法: /switch [ds|go|tr|provider/model]`, "error");
+        ctx.ui.notify(`未知参数 "${arg}"。用法: /switch [ds|go|tr|cc|provider/model]`, "error");
         return;
       }
 
