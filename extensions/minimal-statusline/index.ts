@@ -41,6 +41,20 @@ async function getAuthEntry(provider: string): Promise<{ key?: string; cookie?: 
   }
 }
 
+/** 读取 Command Code 登录 cookie（独立文件，避免污染 auth.json） */
+async function getCommandCodeCookie(): Promise<string | undefined> {
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { homedir } = await import("node:os");
+    const raw = await readFile(join(homedir(), ".pi", "agent", "command-code-cookie.txt"), "utf-8");
+    const cookie = raw.trim();
+    return cookie || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** 拉取 OpenCode Go 订阅配额（rolling/weekly/monthly，官方 /v1/usage） */
 async function fetchOpenCodeGoQuota(): Promise<PlanQuota> {
   const auth = await getAuthEntry("opencode-go");
@@ -78,8 +92,7 @@ const CC_PLANS: Record<string, { monthlyUsd: number; fiveHourCap: number; weekly
 
 /** 拉取 Command Code 订阅配额（billing 端点，需登录 cookie） */
 async function fetchCommandCodeQuota(): Promise<PlanQuota> {
-  const auth = await getAuthEntry("command-code-cookie");
-  const cookie = auth?.cookie;
+  const cookie = await getCommandCodeCookie();
   if (!cookie) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
   try {
     const headers: Record<string, string> = {

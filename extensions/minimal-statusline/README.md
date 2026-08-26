@@ -34,4 +34,4 @@
 ## 配置
 
 - **OpenCode Go**：auth.json 的 `opencode-go` 条目（API key）——已配置则自动生效
-- **Command Code**：auth.json 的 `command-code-cookie` 条目（值为浏览器登录后的完整 Cookie 头）——过期后需重新更新
+- **Command Code**：登录 cookie 存于独立文件 `~/.pi/agent/command-code-cookie.txt`（完整 Cookie 头）——**不要写入 auth.json**（auth.json 只接受 api_key/oauth 类型，写入其它类型会导致整个文件加载失败、所有 provider 401）
