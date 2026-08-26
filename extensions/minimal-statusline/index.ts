@@ -215,13 +215,14 @@ export default function (pi: ExtensionAPI) {
 
   function render(ctx: ExtensionContext) {
     const t = ctx.ui.theme;
-    const modelId = ctx.model?.id ?? "?";
+    // 显示美化模型名（CC · DeepSeek V4 Flash），而非带厂商前缀的原始 id
+    const modelName = ctx.model?.name || ctx.model?.id || "?";
     const usage = ctx.getContextUsage();
     const maxCtx = ctx.model?.contextWindow ?? 0;
     const ctxPct = usage?.percent != null ? `${usage.percent.toFixed(1)}%/${formatTokens(maxCtx)}` : "?/?";
 
     // 模型名 — 亮色
-    ctx.ui.setStatus("s1", t.fg("accent", modelId));
+    ctx.ui.setStatus("s1", t.fg("accent", modelName));
 
     // 上下文 — 按使用率阶梯着色
     const pct = usage?.percent ?? 0;
