@@ -128,11 +128,14 @@ async function fetchCommandCodeQuota(): Promise<PlanQuota> {
     const c = credits.credits;
     if (!c || !plan) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
 
+    // 兼容两种 shape：windowLimits 在 credits 内或响应顶层
+    const wl = (c as any).windowLimits ?? (c as any).window_limits ?? (credits as any).windowLimits ?? (credits as any).window_limits;
+
     // 5h / 周：used/cap 算百分比
-    const fiveUsed = c.windowLimits?.fiveHour?.used ?? 0;
-    const fiveCap = c.windowLimits?.fiveHour?.cap ?? plan.fiveHourCap;
-    const weekUsed = c.windowLimits?.weekly?.used ?? 0;
-    const weekCap = c.windowLimits?.weekly?.cap ?? plan.weeklyCap;
+    const fiveUsed = wl?.fiveHour?.used ?? wl?.five_hour?.used ?? 0;
+    const fiveCap = wl?.fiveHour?.cap ?? wl?.five_hour?.cap ?? plan.fiveHourCap;
+    const weekUsed = wl?.weekly?.used ?? 0;
+    const weekCap = wl?.weekly?.cap ?? plan.weeklyCap;
     // 月：已用 = 总额 - 剩余
     const monthlyUsed = Math.max(0, plan.monthlyUsd - (c.monthlyCredits ?? 0));
 
