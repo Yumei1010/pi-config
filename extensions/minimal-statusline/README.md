@@ -22,7 +22,10 @@
   - `5h` = 5小时滚动窗口用量
   - `周` = 每周窗口用量
   - `月` = 每月窗口用量
-- **Command Code**（`command-code`）：需配置登录 cookie（`COMMAND_CODE_COOKIE` 环境变量或 auth.json 的 `command-code-cookie` 条目），从 billing 端点拉取
+- **Command Code**（`command-code`）：从 billing 端点拉取（需登录 cookie，auth.json 的 `command-code-cookie` 条目）
+  - `5h` = 5小时窗口用量（GOAT 上限 $14）
+  - `周` = 每周窗口用量（GOAT 上限 $35）
+  - `月` = 每月额度已用百分比（GOAT $70/月）
 
 数据缓存在内存 60s，每次 `agent_end` 后刷新。
 
@@ -31,4 +34,4 @@
 ## 配置
 
 - **OpenCode Go**：auth.json 的 `opencode-go` 条目（API key）——已配置则自动生效
-- **Command Code**：需浏览器登录 cookie（`commandcode_prod_.session_token`），设置环境变量 `COMMAND_CODE_COOKIE`，或 auth.json 加 `command-code-cookie` 条目（值为完整 Cookie 头）
+- **Command Code**：auth.json 的 `command-code-cookie` 条目（值为浏览器登录后的完整 Cookie 头）——过期后需重新更新

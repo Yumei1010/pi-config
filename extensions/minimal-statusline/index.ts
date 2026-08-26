@@ -25,15 +25,17 @@ let planQuota: PlanQuota = { fiveHour: undefined, weekly: undefined, monthly: un
 let quotaFetchedAt = 0;
 const QUOTA_TTL_MS = 60_000; // 60s 内不重复请求
 
-/** 从 auth.json 读取 provider 的 API key */
-async function getAuthKey(provider: string): Promise<string | undefined> {
+/** 从 auth.json 读取 provider 的 API key 或 cookie */
+async function getAuthEntry(provider: string): Promise<{ key?: string; cookie?: string } | undefined> {
   try {
     const { readFile } = await import("node:fs/promises");
     const { join } = await import("node:path");
     const { homedir } = await import("node:os");
     const raw = await readFile(join(homedir(), ".pi", "agent", "auth.json"), "utf-8");
     const d = JSON.parse(raw);
-    return d?.[provider]?.key;
+    const e = d?.[provider];
+    if (!e) return undefined;
+    return { key: e.key, cookie: e.value ?? e.cookie };
   } catch {
     return undefined;
   }
@@ -41,11 +43,11 @@ async function getAuthKey(provider: string): Promise<string | undefined> {
 
 /** 拉取 OpenCode Go 订阅配额（rolling/weekly/monthly，官方 /v1/usage） */
 async function fetchOpenCodeGoQuota(): Promise<PlanQuota> {
-  const key = await getAuthKey("opencode-go");
-  if (!key) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
+  const auth = await getAuthEntry("opencode-go");
+  if (!auth?.key) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
   try {
     const res = await fetch("https://opencode.ai/zen/go/v1/usage", {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: { Authorization: `Bearer ${auth.key}` },
     });
     if (!res.ok) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
     const d = await res.json() as {
@@ -65,15 +67,81 @@ async function fetchOpenCodeGoQuota(): Promise<PlanQuota> {
   }
 }
 
+/** Command Code 计划一览（5h/周/月上限美元，2026-08 官网数据） */
+const CC_PLANS: Record<string, { monthlyUsd: number; fiveHourCap: number; weeklyCap: number }> = {
+  "individual-go": { monthlyUsd: 10, fiveHourCap: 3, weeklyCap: 6 },
+  "individual-goat": { monthlyUsd: 70, fiveHourCap: 14, weeklyCap: 35 },
+  "individual-pro": { monthlyUsd: 80, fiveHourCap: 16, weeklyCap: 40 },
+  "individual-max": { monthlyUsd: 150, fiveHourCap: 45, weeklyCap: 90 },
+  "individual-ultra": { monthlyUsd: 300, fiveHourCap: 90, weeklyCap: 180 },
+};
+
+/** 拉取 Command Code 订阅配额（billing 端点，需登录 cookie） */
+async function fetchCommandCodeQuota(): Promise<PlanQuota> {
+  const auth = await getAuthEntry("command-code-cookie");
+  const cookie = auth?.cookie;
+  if (!cookie) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
+  try {
+    const headers: Record<string, string> = {
+      "Cookie": cookie,
+      "Accept": "application/json, text/plain, */*",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+      "Origin": "https://commandcode.ai",
+      "Referer": "https://commandcode.ai/",
+    };
+    // 并行拉 credits + subscriptions
+    const [creditsRes, subsRes] = await Promise.all([
+      fetch("https://api.commandcode.ai/internal/billing/credits", { headers }),
+      fetch("https://api.commandcode.ai/internal/billing/subscriptions", { headers }),
+    ]);
+    if (!creditsRes.ok || !subsRes.ok) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
+
+    const credits = await creditsRes.json() as {
+      credits?: {
+        monthlyCredits?: number; // 剩余（美元）
+        windowLimits?: {
+          fiveHour?: { used?: number; cap?: number };
+          weekly?: { used?: number; cap?: number };
+        };
+      };
+    };
+    const subs = await subsRes.json() as {
+      data?: { planId?: string };
+    };
+
+    const planId = subs.data?.planId ?? "";
+    const plan = CC_PLANS[planId];
+    const c = credits.credits;
+    if (!c || !plan) return { fiveHour: undefined, weekly: undefined, monthly: undefined };
+
+    // 5h / 周：used/cap 算百分比
+    const fiveUsed = c.windowLimits?.fiveHour?.used ?? 0;
+    const fiveCap = c.windowLimits?.fiveHour?.cap ?? plan.fiveHourCap;
+    const weekUsed = c.windowLimits?.weekly?.used ?? 0;
+    const weekCap = c.windowLimits?.weekly?.cap ?? plan.weeklyCap;
+    // 月：已用 = 总额 - 剩余
+    const monthlyUsed = Math.max(0, plan.monthlyUsd - (c.monthlyCredits ?? 0));
+
+    return {
+      fiveHour: fiveCap > 0 ? Math.min(100, (fiveUsed / fiveCap) * 100) : undefined,
+      weekly: weekCap > 0 ? Math.min(100, (weekUsed / weekCap) * 100) : undefined,
+      monthly: plan.monthlyUsd > 0 ? Math.min(100, (monthlyUsed / plan.monthlyUsd) * 100) : undefined,
+    };
+  } catch {
+    return { fiveHour: undefined, weekly: undefined, monthly: undefined };
+  }
+}
+
 /** 带缓存拉取当前订阅配额 */
 async function fetchPlanQuota(): Promise<PlanQuota> {
   const now = Date.now();
   if (now - quotaFetchedAt < QUOTA_TTL_MS) return planQuota;
-  const go = await fetchOpenCodeGoQuota();
+  const [go, cc] = await Promise.all([fetchOpenCodeGoQuota(), fetchCommandCodeQuota()]);
+  // 按当前 provider 取对应数据：合并两个数据源，无值的一侧保持 undefined
   planQuota = {
-    fiveHour: go.fiveHour,
-    weekly: go.weekly,
-    monthly: go.monthly,
+    fiveHour: go.fiveHour !== undefined ? go.fiveHour : cc.fiveHour,
+    weekly: go.weekly !== undefined ? go.weekly : cc.weekly,
+    monthly: go.monthly !== undefined ? go.monthly : cc.monthly,
   };
   quotaFetchedAt = now;
   return planQuota;
