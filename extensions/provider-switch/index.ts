@@ -515,4 +515,91 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`已切换到 ${provider}/${modelId}`, "info");
     },
   });
+
+  // ── /health 命令：健康检查 ────────────────────────────────
+  pi.registerCommand("health", {
+    description: "检查各 provider 的认证与连通性",
+    handler: async (_args, ctx) => {
+      const lines: string[] = ["🔍 Provider 健康检查\n"];
+
+      // 1. auth.json 检查
+      lines.push("▍auth.json 认证配置");
+      const auth = await readAuthJson();
+      const providers = ["deepseek", "opencode-go", "tokenrhythm", "command-code"];
+      for (const prov of providers) {
+        const key = auth?.[prov]?.key;
+        if (key) {
+          lines.push(`  ✅ ${prov.padEnd(13)} key 已配置 (${key.slice(0, 8)}…)`);
+        } else {
+          lines.push(`  ❌ ${prov.padEnd(13)} 未配置 API key`);
+        }
+      }
+
+      // 2. command-code cookie
+      const cookie = await readCcCookie();
+      if (cookie) {
+        // 粗略检查 session_token 是否还在
+        const hasToken = cookie.includes("session_token");
+        lines.push(hasToken ? "  ✅ command-code-cookie 含 session_token" : "  ⚠️ cookie 缺少 session_token（可能过期）");
+      } else {
+        lines.push("  ⚠️ command-code cookie 未配置（配额显示会失效）");
+      }
+
+      // 3. 连通性测试（各 provider 的 models 端点）
+      lines.push("\n▍API 连通性");
+      const tests: Array<[string, string]> = [
+        ["deepseek", "https://api.deepseek.com/v1/models"],
+        ["opencode-go", "https://opencode.ai/zen/go/v1/models"],
+        ["tokenrhythm", "https://tokenrhythm.studio/v1/models"],
+        ["command-code", "https://api.commandcode.ai/provider/v1/models"],
+      ];
+      for (const [prov, url] of tests) {
+        const key = auth?.[prov]?.key;
+        const t0 = Date.now();
+        try {
+          const res = await fetch(url, {
+            headers: key ? { Authorization: `Bearer ${key}` } : {},
+            signal: AbortSignal.timeout(10000),
+          });
+          const ms = Date.now() - t0;
+          if (res.ok) {
+            lines.push(`  ✅ ${prov.padEnd(13)} HTTP ${res.status} (${ms}ms)`);
+          } else {
+            lines.push(`  ❌ ${prov.padEnd(13)} HTTP ${res.status} (${ms}ms)`);
+          }
+        } catch {
+          lines.push(`  ❌ ${prov.padEnd(13)} 连接失败 (${Date.now() - t0}ms)`);
+        }
+      }
+
+      const report = lines.join("\n");
+      ctx.ui.notify(report, report.includes("❌") ? "warning" : "info");
+    },
+  });
+}
+
+/** 读取 auth.json */
+async function readAuthJson(): Promise<Record<string, { key?: string }> | null> {
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { homedir } = await import("node:os");
+    const raw = await readFile(join(homedir(), ".pi", "agent", "auth.json"), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** 读取 command-code cookie */
+async function readCcCookie(): Promise<string | null> {
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { homedir } = await import("node:os");
+    const raw = await readFile(join(homedir(), ".pi", "agent", "command-code-cookie.txt"), "utf-8");
+    return raw.trim() || null;
+  } catch {
+    return null;
+  }
 }

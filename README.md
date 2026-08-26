@@ -46,6 +46,33 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 依赖版本在 `package.json` 中精确锁定。升级方式：改版本号 → `npm install` → 提交推送 → 各机器执行 `pi update --extensions`。
 
+## 指令速查
+
+### 自研插件指令
+
+| 命令 | 功能 |
+|------|------|
+| `/switch [ds\|go\|tr\|cc\|provider/model]` | 切换模型提供方（DeepSeek/Go/TokenRhythm/Command Code） |
+| `/sync-models` | 从 TokenRhythm API 同步最新模型数据 |
+| `/health` | 检查各 provider 的 key 配置与 API 连通性 |
+| `/memory [global\|save\|clear\|cloud …]` | 两级记忆管理 + 云同步 |
+| `/conventions [--all\|--staged\|路径]` | GFramework 代码规范审查 |
+| `/all` | 全部指令 + 中文说明一览 |
+
+### 常用内置指令
+
+| 命令 | 功能 |
+|------|------|
+| `/model` | 切换模型（仅模型，不含 provider） |
+| `/resume` | 浏览历史会话 |
+| `/tree` | 会话树导航 |
+| `/compact` | 压缩上下文 |
+| `/new` / `/fork` / `/clone` | 新会话 / 分叉 / 克隆 |
+| `/settings` | 设置 |
+| `/reload` | 重载插件/配置 |
+
+> 全部指令的中文说明可用 `/all` 查看（含二级/三级指令）。
+
 ## 个人主题
 
 仓库自带 **yumei** 主题（`themes/`，深蓝低饱和底 + 内容区块色块划分）。启用：
