@@ -127,8 +127,29 @@ function findClassDecl(content: string, className?: string): { index: number; te
   const m = content.match(pattern);
   if (!m || m.index === undefined) return null;
   const start = m.index;
-  const before = content.slice(Math.max(0, start - 300), start);
-  return { index: start, text: m[0], before };
+  return { index: start, text: m[0], before: extractLeadingBlock(content, start) };
+}
+
+/**
+ * 提取声明正上方的注释与特性块。
+ * 从声明处向前逐行收集 `///`、`//`、`[Attr]` 行，遇到空行或其他代码即停止。
+ * 此前用固定 300 字符窗口截取，中文注释一写长就会把 `/// <summary>` 挤出窗口而误报"缺少注释"。
+ */
+function extractLeadingBlock(content: string, start: number): string {
+  const lines = content.slice(0, start).split("\n");
+  const kept: string[] = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim();
+    if (trimmed === "") {
+      // 声明前的缩进/空行：还没收集到内容时跳过（split 的尾元素恒为空串），否则视为块边界
+      if (kept.length === 0) continue;
+      break;
+    }
+    const isDocLine = trimmed.startsWith("///") || trimmed.startsWith("//") || trimmed.startsWith("[");
+    if (!isDocLine) break;
+    kept.unshift(lines[i]);
+  }
+  return kept.join("\n");
 }
 
 function hasSummary(before: string): boolean {
@@ -369,7 +390,8 @@ function checkFile(content: string, file: string, rootNs: string | null): Review
   // ── 6. Godot 节点检查 ────────────────────────────────────
   if (classDecl && isGodotNode(content, classDecl.index)) {
     const line = countLines(content, classDecl.index);
-    if (!/public\s+partial\s+class/.test(classDecl.text)) {
+    const isAbstract = /public\s+abstract\s+class/.test(classDecl.text);
+    if (!isAbstract && !/public\s+partial\s+class/.test(classDecl.text)) {
       issues.push({
         severity: "warning",
         rule: "node-partial",
@@ -438,9 +460,14 @@ function checkFile(content: string, file: string, rootNs: string | null): Review
     const body = content.slice(start, start + 600);
     const endIdx = body.indexOf("}");
     const bodyContent = endIdx > -1 ? body.slice(0, endIdx) : body;
-    const stmts = bodyContent.split(";").map((s) => s.trim()).filter(Boolean);
+    const stmts = bodyContent
+      // 先剥掉行尾注释（如 `RegisterEvents();   // 说明`），否则整句不以 `)` 结尾而被误判为非调用链
+      .split(";")
+      .map((s) => s.replace(/\/\/[^\n]*/g, "").trim())
+      .filter(Boolean);
     const nonCallChain = stmts.filter(
-      (s) => !/^(?:await\s+)?[\w.]+\(.*\)$/.test(s) && !/^(?:\/\/.*)?$/.test(s),
+      // 接受可选的赋值前缀（如 `_ = ReadyAsync()`——项目规范要求的丢弃 Task 写法）
+      (s) => !/^(?:await\s+)?(?:[\w.]+\s*=\s*)?[\w.]+\(.*\)$/.test(s) && !/^(?:\/\/.*)?$/.test(s),
     );
     if (nonCallChain.length > 0) {
       issues.push({
