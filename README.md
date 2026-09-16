@@ -112,6 +112,25 @@ npm run typecheck     # tsc --noEmit
 
 > 本地路径安装不会自动执行 `npm install`，`git pull` 后需手动跑一次。
 
+## 定期检修（建议每 2–4 周跑一次）
+
+```bash
+cd <本仓库>
+npm run typecheck          # 与 CI 同款类型检查
+git pull && pi update --extensions   # 拉最新提交 + 重装依赖
+npm outdated               # 查看捆绑依赖的可升级版本
+pi update --models         # 刷新模型目录（/model 列表）
+```
+
+检查清单：
+
+1. **类型检查**：`npm run typecheck` 必须 0 错误（CI 也会跑）
+2. **依赖漂移**：devDependencies 的 `@earendil-works/*` 应跟随本机 `pi --version`；升级后重跑 typecheck
+3. **捆绑插件升级**：`npm outdated` 有新版 → 改 `package.json` 精确版本号 → `npm install` → `npm run typecheck` → 提交推送 → 各机器 `pi update --extensions`
+4. **插件升级后补汉化**：Narumiruna 系列升级后跑 `/all`，看是否有新子命令落到英文（需补 `extensions/command-chinese/index.ts` 的 `SUB_CN_MAP`）
+5. **状态栏配额**：显示 `配额 --` 时先看 `command-code-cookie.txt` 的 `session_token` 是否过期，再运行 `/health`
+6. **认证体检**：`/health` 全绿；`git status` 干净、本地不落后 origin
+
 ## 从旧版迁移（复制安装时代）
 
 旧版通过脚本把插件复制到 `~/.pi/agent/extensions/` 并单独安装 15 个 npm 依赖包。运行一次本仓库的 `install.sh` / `install.ps1` 即可自动迁移：
