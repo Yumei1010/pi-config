@@ -28,7 +28,18 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   "opencode-go": "OPENCODE_API_KEY",
   tokenrhythm: "TOKENRHYTHM_API_KEY",
   "command-code": "COMMAND_CODE_API_KEY",
+  commandcode: "COMMAND_CODE_API_KEY",
 };
+
+/**
+ * 判断凭据值是否可用。
+ *
+ * pi-commandcode-provider 在未配置时会返回字面量 "$COMMAND_CODE_API_KEY" 作为占位，
+ * 直接当真值会把未登录的 provider 误报为已配置。
+ */
+function isUsableCredential(value: string | undefined): value is string {
+  return typeof value === "string" && value.length > 0 && !value.startsWith("$");
+}
 
 // 深色下可读的模型列表（用于交互选择器）
 const OPTIONS: Array<{ provider: string; model: string; label: string }> = [
@@ -473,7 +484,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("switch", {
     description: "在 DeepSeek 直连 / OpenCode Go / TokenRhythm / Command Code 之间切换模型",
     getArgumentCompletions: (prefix) => {
-      const words = ["ds", "go", "tr", "cc", "deepseek", "opencode-go", "tokenrhythm", "command-code"];
+      const words = ["ds", "go", "tr", "cc", "cco", "deepseek", "opencode-go", "tokenrhythm", "command-code", "commandcode", "cc-oauth"];
       return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
     },
     handler: async (args, ctx) => {
@@ -502,6 +513,20 @@ export default function (pi: ExtensionAPI) {
       } else if (arg === "cc" || arg === "command-code" || arg === "goat") {
         provider = "command-code";
         modelId = "deepseek/deepseek-v4-flash";
+      } else if (arg === "cco" || arg === "cc-oauth" || arg === "commandcode") {
+        // pi-commandcode-provider（OAuth /login）注册的 provider：模型目录由上游维护、
+        // 随时可能变化，因此动态挑一个默认模型（优先 Sonnet，其次任意有凭据的模型）。
+        provider = "commandcode";
+        const candidates = ctx.modelRegistry.getAvailable().filter((m) => m.provider === provider);
+        const preferred = candidates.find((m) => m.id.includes("sonnet")) ?? candidates[0];
+        if (!preferred) {
+          ctx.ui.notify(
+            "没有可用的 commandcode 模型：请先 /login 选择 Command Code，或设置 COMMAND_CODE_API_KEY",
+            "error",
+          );
+          return;
+        }
+        modelId = preferred.id;
       } else if (arg.includes("/")) {
         // 用 indexOf 只拆第一个斜杠，模型 id 本身可能含斜杠（如 deepseek/deepseek-v4-flash）
         const idx = arg.indexOf("/");
@@ -532,7 +557,9 @@ export default function (pi: ExtensionAPI) {
     description: "检查各 provider 的认证与连通性",
     handler: async (_args, ctx) => {
       const lines: string[] = ["🔍 Provider 健康检查\n"];
-      const providers = ["deepseek", "opencode-go", "tokenrhythm", "command-code"];
+      // commandcode = pi-commandcode-provider（OAuth /login）注册的 provider；
+      // command-code = 本插件注册的 provider。同一个 Command Code 账号的两条接入路径。
+      const providers = ["deepseek", "opencode-go", "tokenrhythm", "command-code", "commandcode"];
 
       // 1. 凭据来源：auth.json → 环境变量 → modelRegistry（涵盖 /login OAuth 凭据）
       //    只看 auth.json 会把用环境变量或登录方式配置的 provider 误报为未配置。
@@ -542,18 +569,18 @@ export default function (pi: ExtensionAPI) {
       for (const prov of providers) {
         let key = auth?.[prov]?.key;
         let source = key ? "auth.json" : "";
-        if (!key) {
+        if (!isUsableCredential(key)) {
           const envName = PROVIDER_ENV_KEYS[prov];
           key = envName ? process.env[envName] : undefined;
-          if (key) source = envName;
+          if (isUsableCredential(key)) source = envName;
         }
-        if (!key) {
+        if (!isUsableCredential(key)) {
           try {
             key = await ctx.modelRegistry.getApiKeyForProvider(prov);
-            if (key) source = "凭据存储/登录";
+            if (isUsableCredential(key)) source = "凭据存储/登录";
           } catch { /* 未配置的 provider 可能直接抛错 */ }
         }
-        if (key) {
+        if (isUsableCredential(key)) {
           keys.set(prov, key);
           lines.push(`  ✅ ${prov.padEnd(13)} 已配置（${source}，${key.slice(0, 8)}…）`);
         } else {
@@ -562,8 +589,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       // 2. command-code cookie
-      const cookie = await readCcCookie();
-      if (cookie) {
+      const cookie = await readCcCookie();      if (cookie) {
         // 粗略检查 session_token 是否还在
         const hasToken = cookie.includes("session_token");
         lines.push(hasToken ? "  ✅ command-code-cookie 含 session_token" : "  ⚠️ cookie 缺少 session_token（可能过期）");
@@ -578,6 +604,7 @@ export default function (pi: ExtensionAPI) {
         ["opencode-go", "https://opencode.ai/zen/go/v1/models"],
         ["tokenrhythm", "https://tokenrhythm.studio/v1/models"],
         ["command-code", "https://api.commandcode.ai/provider/v1/models"],
+        ["commandcode", "https://api.commandcode.ai/provider/v1/models"],
       ];
       for (const [prov, url] of tests) {
         const key = keys.get(prov);

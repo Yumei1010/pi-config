@@ -61,6 +61,9 @@ const CN_MAP: Record<string, string> = {
   // pi-web-access / pi-mcp-adapter / 其他
   "web-access": "网页访问",
   "mcp-adapter": "MCP 适配器",
+  "commandcode-refresh": "刷新 Command Code 模型目录",
+  "commandcode-status": "查看 Command Code provider 诊断信息",
+  "commandcode-quota": "查看 Command Code 账号用量与配额",
   websearch: "网页搜索",
   curator: "搜索结果整理",
   "google-account": "Google 账号管理",
@@ -76,6 +79,17 @@ const CN_MAP: Record<string, string> = {
 // ── 二级/三级指令（子命令/参数）→ 中文说明映射 ──────────────
 // 键为 "命令名 子命令"，补全候选/help 展示时据此汉化 description
 const SUB_CN_MAP: Record<string, string> = {
+  // plan 子命令
+  "plan start": "启用计划模式（不发送提示词）",
+  "plan show": "查看待确认/已保存/进行中的计划",
+  "plan finalize": "请求生成完整计划",
+  "plan implement": "实施已完成或已保存的计划",
+  "plan save": "保存已完成的计划备用",
+  "plan settings": "打开计划模式设置",
+  "plan export": "导出计划为 Markdown 文件",
+  "plan exit": "退出计划模式或清除当前计划",
+  "plan off": "退出计划模式或清除当前计划（exit 别名）",
+  "plan tools": "开始计划流程前选择可用工具",
   // goal 子命令（0.54 起有序队列已移除：add/prioritize/drop-last/skip 不再是子命令）
   "goal pause": "暂停当前目标",
   "goal resume": "恢复已停止/预算受限的目标",
@@ -148,7 +162,7 @@ const SUB_CN_MAP: Record<string, string> = {
   // conventions 参数
   "conventions --all": "审查全部未提交变更",
   "conventions --staged": "审查已暂存变更",
-  // switch 参数
+  // switch 参数（cc = 本插件注册的 command-code；cc-oauth/cco = 捆绑的 pi-commandcode-provider）
   "switch ds": "切到 DeepSeek 直连",
   "switch go": "切到 OpenCode Go",
   "switch tr": "切到 TokenRhythm（基元律动）",
@@ -159,6 +173,12 @@ const SUB_CN_MAP: Record<string, string> = {
   "switch opencode-go": "切到 OpenCode Go",
   "switch tokenrhythm": "切到 TokenRhythm（基元律动）",
   "switch jiyuan": "切到 TokenRhythm（基元律动）",
+  "switch cc-oauth": "切到 Command Code（OAuth 登录版 provider）",
+  "switch cco": "切到 Command Code（OAuth 登录版 provider）",
+  // commandcode-* 子命令（pi-commandcode-provider）
+  "commandcode-refresh": "刷新 Command Code 模型目录",
+  "commandcode-status": "查看 Command Code provider 诊断信息",
+  "commandcode-quota": "查看 Command Code 账号用量与配额",
   // sync-models 参数
   "sync-models tr": "同步 TokenRhythm 模型数据",
   "sync-models tokenrhythm": "同步 TokenRhythm 模型数据",
