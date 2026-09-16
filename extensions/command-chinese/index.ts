@@ -76,16 +76,14 @@ const CN_MAP: Record<string, string> = {
 // ── 二级/三级指令（子命令/参数）→ 中文说明映射 ──────────────
 // 键为 "命令名 子命令"，补全候选/help 展示时据此汉化 description
 const SUB_CN_MAP: Record<string, string> = {
-  // goal 子命令
+  // goal 子命令（0.54 起有序队列已移除：add/prioritize/drop-last/skip 不再是子命令）
   "goal pause": "暂停当前目标",
   "goal resume": "恢复已停止/预算受限的目标",
   "goal clear": "清除当前目标",
-  "goal edit": "编辑当前目标目标描述",
+  "goal stop": "清除当前目标（clear 的别名）",
+  "goal edit": "编辑当前目标描述",
   "goal status": "查看当前目标",
-  "goal add": "队尾添加新目标",
-  "goal prioritize": "队首优先新目标",
-  "goal drop-last": "移除最后一个目标",
-  "goal skip": "跳过当前目标",
+  "goal --tokens": "为目标设置 token 预算",
   // firecrawl 子命令
   "firecrawl help": "查看命令用法",
   "firecrawl config": "查看配置快速开始",

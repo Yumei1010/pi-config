@@ -38,21 +38,21 @@
     ]
   },
   "dependencies": {
-    "@narumitw/pi-btw": "0.52.0",
-    "@narumitw/pi-caffeinate": "0.49.4",
-    "@narumitw/pi-chrome-devtools": "0.52.0",
-    "@narumitw/pi-firecrawl": "0.50.0",
-    "@narumitw/pi-github-pr": "0.49.4",
-    "@narumitw/pi-goal": "0.51.0",
+    "@narumitw/pi-btw": "0.58.1",
+    "@narumitw/pi-caffeinate": "0.49.6",
+    "@narumitw/pi-chrome-devtools": "0.53.2",
+    "@narumitw/pi-firecrawl": "0.50.2",
+    "@narumitw/pi-github-pr": "0.49.7",
+    "@narumitw/pi-goal": "0.54.5",
     "@narumitw/pi-google-genai": "0.49.3",
-    "@narumitw/pi-lsp": "0.49.4",
+    "@narumitw/pi-lsp": "0.49.7",
     "@narumitw/pi-plan-mode": "0.49.3",
     "@narumitw/pi-retry": "0.31.0",
     "@narumitw/pi-subagents": "1.0.2",
-    "@narumitw/pi-sync": "0.49.10",
+    "@narumitw/pi-sync": "0.51.0",
     "@narumitw/pi-wait-what": "0.13.1",
-    "pi-mcp-adapter": "2.26.0",
-    "pi-web-access": "0.23.0"
+    "pi-mcp-adapter": "2.34.0",
+    "pi-web-access": "0.29.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
