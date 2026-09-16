@@ -20,7 +20,7 @@ const TAG_RULES: Array<{ keywords: string[]; label: string }> = [
   { keywords: ["review", "审查", "规范", "conventions"], label: "review" },
   { keywords: ["deploy", "部署", "发布", "release", "推送"], label: "deploy" },
   { keywords: ["memory", "记忆", "备忘", "存档"], label: "memory" },
-  { keywords: ["switch", "切换", "provider", "模型", "tokenrhythm"], label: "switch" },
+  { keywords: ["switch", "切换", "provider", "模型"], label: "switch" },
   { keywords: ["git", "commit", "push", "提交"], label: "git" },
   { keywords: ["sync", "同步", "cloud", "云端"], label: "sync" },
   { keywords: ["theme", "主题", "配色", "色块", "颜色"], label: "theme" },

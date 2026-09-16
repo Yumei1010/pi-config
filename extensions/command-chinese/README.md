@@ -22,6 +22,6 @@
 
 ## 说明
 
-- 内置映射 43+ 条（内置命令 + 本仓库扩展 + Narumiruna 插件 + web-access/mcp-adapter）
-- 二级/三级指令映射 90+ 条（goal/firecrawl/google-genai/chrome-devtools/sync/subagents/memory/conventions/switch/sync-models）
+- 内置映射 46 条（内置命令 + 本仓库扩展 + Narumiruna 插件 + web-access/mcp-adapter）
+- 二级/三级指令映射 85 条（goal/firecrawl/google-genai/chrome-devtools/sync/subagents/memory/conventions/switch、commandcode-* 等）
 - 内置 `/help` 与插件自身 UI 的英文描述由 pi/插件代码决定，扩展无法修改——补全和 `/all` 已覆盖

@@ -165,23 +165,16 @@ const SUB_CN_MAP: Record<string, string> = {
   // switch 参数（cc/cco = 捆绑的 pi-commandcode-provider 注册的 commandcode provider）
   "switch ds": "切到 DeepSeek 直连",
   "switch go": "切到 OpenCode Go",
-  "switch tr": "切到 TokenRhythm（基元律动）",
   "switch cc": "切到 Command Code",
   "switch cco": "切到 Command Code（cc 的别名）",
   "switch cc-oauth": "切到 Command Code（cc 的别名）",
   "switch commandcode": "切到 Command Code",
   "switch deepseek": "切到 DeepSeek 直连",
   "switch opencode-go": "切到 OpenCode Go",
-  "switch tokenrhythm": "切到 TokenRhythm（基元律动）",
-  "switch jiyuan": "切到 TokenRhythm（基元律动）",
   // commandcode-* 子命令（pi-commandcode-provider）
   "commandcode-refresh": "刷新 Command Code 模型目录",
   "commandcode-status": "查看 Command Code provider 诊断信息",
   "commandcode-quota": "查看 Command Code 账号用量与配额",
-  // sync-models 参数
-  "sync-models tr": "同步 TokenRhythm 模型数据",
-  "sync-models tokenrhythm": "同步 TokenRhythm 模型数据",
-  "sync-models jiyuan": "同步 TokenRhythm 模型数据",
 };
 
 /** 尝试精确匹配或带 skill:/模板前缀的 name */

@@ -65,8 +65,7 @@ Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 pr
 
 | 命令 | 功能 |
 |------|------|
-| `/switch [ds\|go\|tr\|cc\|provider/model]` | 切换模型提供方（`cc`/`cco`/`commandcode` 都是 Command Code） |
-| `/sync-models` | 从 TokenRhythm API 同步最新模型数据 |
+| `/switch [ds\|go\|cc\|provider/model]` | 切换模型提供方（`cc`/`cco`/`commandcode` 都是 Command Code） |
 | `/health` | 检查各 provider 的凭据配置与 API 连通性 |
 | `/commandcode-quota` | 查看 Command Code 账号用量与配额（OAuth 版） |
 | `/commandcode-status` | 查看 Command Code provider 诊断信息 |
@@ -113,7 +112,7 @@ pi config   # TUI 中启用/禁用包内单个插件，Tab 切换全局/项目�
 
 ## 认证配置
 
-- **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`；TokenRhythm 为 `tokenrhythm` 条目 / `TOKENRHYTHM_API_KEY`（否则 `/switch go|tr` 会提示没有可用 Key）
+- **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`（否则 `/switch go` 会提示没有可用 Key）
 - **Command Code**：`/login` 选 Command Code 走 OAuth（凭据存在 `auth.json` 的 `commandcode` 条目），或设 `COMMAND_CODE_API_KEY`。
   pi-commandcode-provider 的凭据回退链还会读取 `auth.json` 里早期留下的 `command-code` 条目（`{ type: "api_key", key: "user_xxx" }`），所以不重新登录也能用；`/health` 会标出这个来源。无凭据时 provider 仍会注册但不可用，`/switch cc` 会提示先登录
 - **project-memory 云同步**：私有仓库需已配置 git 凭据/代理
