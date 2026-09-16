@@ -167,6 +167,17 @@ function pctColor(pct: number): any {
   return pct > 90 ? "error" : pct > 75 ? "warning" : pct > 50 ? "muted" : pct > 20 ? "success" : "dim";
 }
 
+/**
+ * 配额百分比格式化为短字符串。
+ *
+ * Command Code 的百分比由 used/cap 相除得出（如 3/7 → 42.85714285714286），
+ * 直接插值会撑爆状态栏，因此整数不留小数、小数保留一位。
+ */
+function formatPercent(pct: number): string {
+  const rounded = Math.round(pct * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}%`;
+}
+
 /** 与内置 footer 相同的数字格式化（10k 以下保留一位小数，以上取整） */
 function formatTokens(count: number): string {
   if (count < 1000) return count.toString();
@@ -281,13 +292,13 @@ export default function (pi: ExtensionAPI) {
     const q = prov === "opencode-go" ? goQuota : ccQuota;
     const parts: string[] = [];
     if (q.fiveHour !== undefined) {
-      parts.push(t.fg(pctColor(q.fiveHour), `5h ${q.fiveHour}%`));
+      parts.push(t.fg(pctColor(q.fiveHour), `5h ${formatPercent(q.fiveHour)}`));
     }
     if (q.weekly !== undefined) {
-      parts.push(t.fg(pctColor(q.weekly), `周 ${q.weekly}%`));
+      parts.push(t.fg(pctColor(q.weekly), `周 ${formatPercent(q.weekly)}`));
     }
     if (q.monthly !== undefined) {
-      parts.push(t.fg(pctColor(q.monthly), `月 ${q.monthly}%`));
+      parts.push(t.fg(pctColor(q.monthly), `月 ${formatPercent(q.monthly)}`));
     }
     if (parts.length > 0) {
       ctx.ui.setStatus("s7", parts.join(" "));
@@ -302,11 +313,35 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  pi.on("session_start", (_event, ctx) => {
+  /**
+   * 判断 ctx 是否仍有效。
+   *
+   * ctx 的属性 getter 每次都会执行 runner 的 assertActive()；一旦发生 /reload、新会话、
+   * fork 或切换会话，旧 ctx 的任意属性访问都会抛 stale 错误。因此 async await 之后
+   * 必须先做这道检查，否则后续 render() 抛出的异常会变成未处理的 Promise 拒绝，
+   * 直接导致 pi 进程退出（uncaughtException）。
+   */
+  function isCtxActive(ctx: ExtensionContext): boolean {
+    try {
+      void ctx.mode; // 只读探测：命中任意 getter 即触发 assertActive()
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  pi.on("session_start", async (_event, ctx) => {
     scanHistory(ctx);
     render(ctx);
     // 启动即异步拉取订阅配额（避免新会话显示旧值/空值）
-    void fetchPlanQuota(ctx.model?.provider ?? "").then(() => render(ctx));
+    const provider = ctx.model?.provider ?? "";
+    try {
+      await fetchPlanQuota(provider);
+    } catch {
+      // fetchPlanQuota 内部已兜底，此处仅防止意外异常外泄
+    }
+    // await 期间可能发生 reload / 新会话 / 切换会话；旧 ctx 已失效时跳过重渲染
+    if (isCtxActive(ctx)) render(ctx);
   });
 
   // agent_end 时所有消息已持久化到 sessionManager（message_end 时 appendMessage），
@@ -315,8 +350,14 @@ export default function (pi: ExtensionAPI) {
     scanHistory(ctx);
     render(ctx);
     // 每轮对话结束强制刷新订阅配额（绕过缓存），再重渲染
-    await fetchPlanQuota(ctx.model?.provider ?? "", true);
-    render(ctx);
+    const provider = ctx.model?.provider ?? "";
+    try {
+      await fetchPlanQuota(provider, true);
+    } catch {
+      // fetchPlanQuota 内部已兜底，此处仅防止意外异常外泄
+    }
+    // await 期间可能发生 reload / 新会话 / 切换会话；旧 ctx 已失效时跳过重渲染
+    if (isCtxActive(ctx)) render(ctx);
   });
 
   pi.on("session_shutdown", (_event, ctx) => clear(ctx));
