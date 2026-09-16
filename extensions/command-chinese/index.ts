@@ -213,6 +213,8 @@ export default function (pi: ExtensionAPI) {
   let userMap: Record<string, string> | null = null;
   // 已提示过的未汉化命令
   const notifiedUntranslated = new Set<string>();
+  // 新指令轮询定时器（每次会话启动重建，结束时清除）
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
 
   // ── 加载用户配置 .pi/command-cn-map.json ──────────────────
   async function loadUserMap(cwd: string): Promise<Record<string, string>> {
@@ -271,10 +273,20 @@ export default function (pi: ExtensionAPI) {
   }
 
   // ── 1. 补全汉化：装饰内置补全结果 ─────────────────────────
+  // session_shutdown 在模块加载时注册一次即可：放到 session_start 里会每开一个会话就往
+  // runner 的处理器列表里追加一条，长期使用（/new、/resume、/fork、/reload）会不断膨胀。
+  pi.on("session_shutdown", () => {
+    if (pollTimer !== undefined) {
+      clearInterval(pollTimer);
+      pollTimer = undefined;
+    }
+  });
+
   pi.on("session_start", (_event, ctx) => {
     // 立即检测一次 + 定时轮询新增插件指令
     void checkNewCommands(ctx);
-    const timer = setInterval(() => void checkNewCommands(ctx), POLL_INTERVAL_MS);
+    if (pollTimer !== undefined) clearInterval(pollTimer);
+    pollTimer = setInterval(() => void checkNewCommands(ctx), POLL_INTERVAL_MS);
 
     ctx.ui.addAutocompleteProvider((current) => ({
       triggerCharacters: ["/"],
@@ -304,9 +316,6 @@ export default function (pi: ExtensionAPI) {
         return current.shouldTriggerFileCompletion?.(lines, line, col) ?? true;
       },
     }));
-
-    // 清理定时器
-    pi.on("session_shutdown", () => clearInterval(timer));
   });
 
   // /reload 时立即重新检测（resources_discover 在 reload 后触发）

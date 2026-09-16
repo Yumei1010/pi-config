@@ -9,22 +9,22 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-/** 关键词 → 标签映射 */
+/** 关键词 → 标签映射（同一关键词只归属一个标签，避免一条消息打出重复标签） */
 const TAG_RULES: Array<{ keywords: string[]; label: string }> = [
   { keywords: ["bug", "修复", "错误", "崩溃", "异常", "故障"], label: "bugfix" },
-  { keywords: ["feature", "功能", "实现", "新增", "添加", "新"], label: "feature" },
-  { keywords: ["refactor", "重构", "重写", "优化", "清理", "整理"], label: "refactor" },
+  { keywords: ["feature", "功能", "实现", "新增", "添加"], label: "feature" },
+  { keywords: ["refactor", "重构", "重写", "清理", "整理"], label: "refactor" },
   { keywords: ["test", "测试", "单元测试", "单测", "ci"], label: "test" },
   { keywords: ["config", "配置", "设置", "环境", "env"], label: "config" },
   { keywords: ["docs", "文档", "readme", "注释", "说明"], label: "docs" },
-  { keywords: ["review", "审查", "规范", "conventions", "review"], label: "review" },
+  { keywords: ["review", "审查", "规范", "conventions"], label: "review" },
   { keywords: ["deploy", "部署", "发布", "release", "推送"], label: "deploy" },
   { keywords: ["memory", "记忆", "备忘", "存档"], label: "memory" },
   { keywords: ["switch", "切换", "provider", "模型", "tokenrhythm"], label: "switch" },
-  { keywords: ["git", "commit", "push", "提交", "推送"], label: "git" },
+  { keywords: ["git", "commit", "push", "提交"], label: "git" },
   { keywords: ["sync", "同步", "cloud", "云端"], label: "sync" },
   { keywords: ["theme", "主题", "配色", "色块", "颜色"], label: "theme" },
-  { keywords: ["perf", "性能", "慢", "卡顿", "优化"], label: "performance" },
+  { keywords: ["perf", "性能", "优化", "卡顿"], label: "performance" },
   { keywords: ["security", "安全", "权限", "认证"], label: "security" },
 ];
 
@@ -53,10 +53,16 @@ export default function (pi: ExtensionAPI) {
 
     if (tags.length === 0) return;
 
-    // 为当前叶子节点设置标签；多标签用 + 合并（如 git+refactor），保留全部信息
+    // 为当前叶子节点设置标签；多标签用 + 合并（如 git+refactor），保留全部信息。
+    // 已有标签（手动 /name 之外的 Ctrl+L 书签等）保留，只做合并去重，不覆盖用户设置。
     const leafId = ctx.sessionManager.getLeafId();
-    if (leafId) {
-      pi.setLabel(leafId, [...new Set(tags)].join("+"));
-    }
+    if (!leafId) return;
+    const existing = (ctx.sessionManager.getLabel(leafId) ?? "")
+      .split("+")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const merged = [...new Set([...existing, ...tags])];
+    if (merged.join("+") === existing.join("+")) return;
+    pi.setLabel(leafId, merged.join("+"));
   });
 }

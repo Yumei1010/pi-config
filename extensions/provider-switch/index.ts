@@ -18,6 +18,17 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/** 各 provider 支持的 API Key 环境变量（/health 里作为 auth.json 之外的凭据来源） */
+const PROVIDER_ENV_KEYS: Record<string, string> = {
+  deepseek: "DEEPSEEK_API_KEY",
+  "opencode-go": "OPENCODE_API_KEY",
+  tokenrhythm: "TOKENRHYTHM_API_KEY",
+  "command-code": "COMMAND_CODE_API_KEY",
+};
 
 // 深色下可读的模型列表（用于交互选择器）
 const OPTIONS: Array<{ provider: string; model: string; label: string }> = [
@@ -521,17 +532,32 @@ export default function (pi: ExtensionAPI) {
     description: "检查各 provider 的认证与连通性",
     handler: async (_args, ctx) => {
       const lines: string[] = ["🔍 Provider 健康检查\n"];
-
-      // 1. auth.json 检查
-      lines.push("▍auth.json 认证配置");
-      const auth = await readAuthJson();
       const providers = ["deepseek", "opencode-go", "tokenrhythm", "command-code"];
+
+      // 1. 凭据来源：auth.json → 环境变量 → modelRegistry（涵盖 /login OAuth 凭据）
+      //    只看 auth.json 会把用环境变量或登录方式配置的 provider 误报为未配置。
+      lines.push("▍凭据配置");
+      const auth = await readAuthJson();
+      const keys = new Map<string, string>();
       for (const prov of providers) {
-        const key = auth?.[prov]?.key;
+        let key = auth?.[prov]?.key;
+        let source = key ? "auth.json" : "";
+        if (!key) {
+          const envName = PROVIDER_ENV_KEYS[prov];
+          key = envName ? process.env[envName] : undefined;
+          if (key) source = envName;
+        }
+        if (!key) {
+          try {
+            key = await ctx.modelRegistry.getApiKeyForProvider(prov);
+            if (key) source = "凭据存储/登录";
+          } catch { /* 未配置的 provider 可能直接抛错 */ }
+        }
         if (key) {
-          lines.push(`  ✅ ${prov.padEnd(13)} key 已配置 (${key.slice(0, 8)}…)`);
+          keys.set(prov, key);
+          lines.push(`  ✅ ${prov.padEnd(13)} 已配置（${source}，${key.slice(0, 8)}…）`);
         } else {
-          lines.push(`  ❌ ${prov.padEnd(13)} 未配置 API key`);
+          lines.push(`  ❌ ${prov.padEnd(13)} 未配置凭据（auth.json / ${PROVIDER_ENV_KEYS[prov] ?? "环境变量"} / /login）`);
         }
       }
 
@@ -554,7 +580,7 @@ export default function (pi: ExtensionAPI) {
         ["command-code", "https://api.commandcode.ai/provider/v1/models"],
       ];
       for (const [prov, url] of tests) {
-        const key = auth?.[prov]?.key;
+        const key = keys.get(prov);
         const t0 = Date.now();
         try {
           const res = await fetch(url, {
@@ -581,9 +607,6 @@ export default function (pi: ExtensionAPI) {
 /** 读取 auth.json */
 async function readAuthJson(): Promise<Record<string, { key?: string }> | null> {
   try {
-    const { readFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
-    const { homedir } = await import("node:os");
     const raw = await readFile(join(homedir(), ".pi", "agent", "auth.json"), "utf-8");
     return JSON.parse(raw);
   } catch {
@@ -594,9 +617,6 @@ async function readAuthJson(): Promise<Record<string, { key?: string }> | null> 
 /** 读取 command-code cookie */
 async function readCcCookie(): Promise<string | null> {
   try {
-    const { readFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
-    const { homedir } = await import("node:os");
     const raw = await readFile(join(homedir(), ".pi", "agent", "command-code-cookie.txt"), "utf-8");
     return raw.trim() || null;
   } catch {
