@@ -32,8 +32,8 @@
 - `deepseek`：DeepSeek 官方直连 Key
 - `opencode-go`：OpenCode Go 订阅 Key（或 `OPENCODE_API_KEY`）
 - `tokenrhythm`：基元律动 Key（或 `TOKENRHYTHM_API_KEY`，格式 `sk_xxx`）
-- `commandcode`：Command Code Key（或 `COMMAND_CODE_API_KEY`，格式 `user_xxx`）——用于 `/health` 检查，
-  实际请求凭据由 `pi-commandcode-provider` 解析（`/login` OAuth 或该环境变量）
+- `commandcode`：Command Code Key（或 `COMMAND_CODE_API_KEY`，格式 `user_xxx`）——`/health` 用它做检查。
+  实际请求凭据由 `pi-commandcode-provider` 解析：优先 `/login` 的 OAuth，否则回退到该环境变量或 `auth.json` 里的 `commandcode` / 早期遗留的 `command-code` 条目
 
 ## 说明
 

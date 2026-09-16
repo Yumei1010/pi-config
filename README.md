@@ -43,7 +43,7 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 - 13 个 Narumiruna 插件：goal / plan-mode / subagents / firecrawl / lsp / google-genai / chrome-devtools / github-pr / retry / sync / btw / caffeinate / wait-what
 - pi-web-access / pi-mcp-adapter（含 mcp-scripting skill）
-- pi-commandcode-provider（Command Code OAuth 登录版 provider，见下方「两套 Command Code 接入」）
+- pi-commandcode-provider（Command Code 的 provider，见下方「Command Code 接入」）
 
 依赖版本在 `package.json` 中精确锁定。升级方式：改版本号 → `npm install` → 提交推送 → 各机器执行 `pi update --extensions`。
 
@@ -114,7 +114,8 @@ pi config   # TUI 中启用/禁用包内单个插件，Tab 切换全局/项目�
 ## 认证配置
 
 - **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`；TokenRhythm 为 `tokenrhythm` 条目 / `TOKENRHYTHM_API_KEY`（否则 `/switch go|tr` 会提示没有可用 Key）
-- **Command Code**：`/login` 选 Command Code 走 OAuth（凭据存在 `auth.json` 的 `commandcode` 条目），或设 `COMMAND_CODE_API_KEY`；未登录时 provider 仍会注册但不可用，`/switch cc` 会提示先登录。`auth.json` 里遗留的 `command-code` 条目已不再被任何 provider 使用
+- **Command Code**：`/login` 选 Command Code 走 OAuth（凭据存在 `auth.json` 的 `commandcode` 条目），或设 `COMMAND_CODE_API_KEY`。
+  pi-commandcode-provider 的凭据回退链还会读取 `auth.json` 里早期留下的 `command-code` 条目（`{ type: "api_key", key: "user_xxx" }`），所以不重新登录也能用；`/health` 会标出这个来源。无凭据时 provider 仍会注册但不可用，`/switch cc` 会提示先登录
 - **project-memory 云同步**：私有仓库需已配置 git 凭据/代理
 
 ## 开发本仓库

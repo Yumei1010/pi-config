@@ -20,6 +20,7 @@
  *   - Command Code 不再在本插件里注册 provider：早期手写的 "command-code" provider 与
  *     pi-commandcode-provider 的 "commandcode" 指向同一个上游（api.commandcode.ai/provider/v1）
  *     却各自维护模型清单，容易混淆且连接不稳，现已统一用上游维护的 commandcode。
+ *     （auth.json 里的 command-code 条目仍被 pi-commandcode-provider 当作凭据回退源读取。）
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -484,6 +485,13 @@ export default function (pi: ExtensionAPI) {
             key = await ctx.modelRegistry.getApiKeyForProvider(prov);
             if (isUsableCredential(key)) source = "凭据存储/登录";
           } catch { /* 未配置的 provider 可能直接抛错 */ }
+        }
+        // pi-commandcode-provider 的凭据回退链会把 auth.json 里的 command-code 条目
+        // （早期 provider-switch 自建 provider 时代留下的那个）也当命令名 provider 的 key，
+        // 所以这里单独标出来源，避免看到 ✅ 但不知道 key 从哪来。
+        if (prov === "commandcode" && !isUsableCredential(key) && isUsableCredential(auth?.["command-code"]?.key)) {
+          key = auth["command-code"].key;
+          source = "auth.json（command-code 条目）";
         }
         if (isUsableCredential(key)) {
           keys.set(prov, key);
