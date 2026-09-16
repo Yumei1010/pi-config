@@ -55,6 +55,8 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 provider id `commandcode`（上游维护的 69 个模型目录）。用 `/login` 选 Command Code 走 OAuth，或设 `COMMAND_CODE_API_KEY`。
 
+推荐默认模型：`commandcode` / `deepseek/deepseek-v4.1-flash`（旧的 `deepseek-v4.1-flash-expires-on-0910` 预览模型已随 DeepSeek 正式版发布而弃用）。
+
 > 早期 `provider-switch` 里还手写过一套 `command-code` provider（21 个模型 + 静态清单）。它与 `commandcode` 指向**同一个上游**（`api.commandcode.ai/provider/v1`），却各自维护模型清单，既重复又容易混淆，且连接不稳——已于 2026-09-16 删除，`/switch cc`、`/switch cco`、`/switch commandcode` 现在都指向 `commandcode`。
 >
 > 状态栏的订阅配额仍走订阅 billing 端点 + `~/.pi/agent/command-code-cookie.txt` 的登录 cookie（账号级，与 provider 注册方式无关）。cookie 过期时状态栏会显示「配额 --」，也可用官方的 `/commandcode-quota`。
@@ -108,6 +110,21 @@ Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 pr
 
 ```bash
 pi config   # TUI 中启用/禁用包内单个插件，Tab 切换全局/项目作用域
+```
+
+## 新机器上推荐同步的个人设置
+
+本仓库只复刻插件/技能/主题文件，`~/.pi/agent/settings.json` 属于本机状态、不入库，装完建议手动确认这几项：
+
+```jsonc
+{
+  "theme": "yumei",                                        // 本仓库自带主题
+  "defaultProvider": "commandcode",
+  "defaultModel": "deepseek/deepseek-v4.1-flash",            // 需先 /login 或配 COMMAND_CODE_API_KEY
+  "defaultThinkingLevel": "high",
+  "httpProxy": "http://127.0.0.1:7897",                     // 按本机代理调整；直连可删
+  "retry": { "enabled": true, "maxRetries": 6, "baseDelayMs": 1200 }
+}
 ```
 
 ## 认证配置
