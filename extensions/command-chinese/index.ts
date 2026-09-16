@@ -162,19 +162,18 @@ const SUB_CN_MAP: Record<string, string> = {
   // conventions 参数
   "conventions --all": "审查全部未提交变更",
   "conventions --staged": "审查已暂存变更",
-  // switch 参数（cc = 本插件注册的 command-code；cc-oauth/cco = 捆绑的 pi-commandcode-provider）
+  // switch 参数（cc/cco = 捆绑的 pi-commandcode-provider 注册的 commandcode provider）
   "switch ds": "切到 DeepSeek 直连",
   "switch go": "切到 OpenCode Go",
   "switch tr": "切到 TokenRhythm（基元律动）",
-  "switch cc": "切到 Command Code (GOAT)",
-  "switch command-code": "切到 Command Code (GOAT)",
-  "switch goat": "切到 Command Code (GOAT)",
+  "switch cc": "切到 Command Code",
+  "switch cco": "切到 Command Code（cc 的别名）",
+  "switch cc-oauth": "切到 Command Code（cc 的别名）",
+  "switch commandcode": "切到 Command Code",
   "switch deepseek": "切到 DeepSeek 直连",
   "switch opencode-go": "切到 OpenCode Go",
   "switch tokenrhythm": "切到 TokenRhythm（基元律动）",
   "switch jiyuan": "切到 TokenRhythm（基元律动）",
-  "switch cc-oauth": "切到 Command Code（OAuth 登录版 provider）",
-  "switch cco": "切到 Command Code（OAuth 登录版 provider）",
   // commandcode-* 子命令（pi-commandcode-provider）
   "commandcode-refresh": "刷新 Command Code 模型目录",
   "commandcode-status": "查看 Command Code provider 诊断信息",

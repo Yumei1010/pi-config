@@ -51,14 +51,13 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 - **`@narumitw/pi-subagents` 锁在 1.0.2**。上游 2.x/3.x 是推倒重写：`subagent_auto`（自主工作流规划）在 2.0 被移除，3.0 起只剩 `subagent_spawn/inspect/cancel/wait/send` 五个工具并删掉 `/subagents` 命令，`subagent`（workflow / panel / verifiedExecution）、`subagent_consult`、`subagent_mailbox`、`subagent_manage` 全部消失。本环境依赖 1.0.2 的委派套件，所以在升级前先对比工具表，别只看 `npm outdated` 的版本号。
 
-### 两套 Command Code 接入
+### Command Code 接入
 
-| provider id | 来源 | 登录方式 | 用途 |
-|---|---|---|---|
-| `command-code` | 本仓库 `provider-switch` | `auth.json` 的 `command-code` 条目 / `COMMAND_CODE_API_KEY` | 手写模型清单，`/switch cc` |
-| `commandcode` | pi-commandcode-provider | `/login` 选 Command Code（OAuth） | 上游维护的模型目录，`/switch cco` |
+Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 provider id `commandcode`（上游维护的 69 个模型目录）。用 `/login` 选 Command Code 走 OAuth，或设 `COMMAND_CODE_API_KEY`。
 
-两者共用同一个账号，状态栏的订阅配额（cookie）对两者都生效；`/health` 也同时检查两者（会忽略未配置时返回的 `$COMMAND_CODE_API_KEY` 占位值）。
+> 早期 `provider-switch` 里还手写过一套 `command-code` provider（21 个模型 + 静态清单）。它与 `commandcode` 指向**同一个上游**（`api.commandcode.ai/provider/v1`），却各自维护模型清单，既重复又容易混淆，且连接不稳——已于 2026-09-16 删除，`/switch cc`、`/switch cco`、`/switch commandcode` 现在都指向 `commandcode`。
+>
+> 状态栏的订阅配额仍走订阅 billing 端点 + `~/.pi/agent/command-code-cookie.txt` 的登录 cookie（账号级，与 provider 注册方式无关）。cookie 过期时状态栏会显示「配额 --」，也可用官方的 `/commandcode-quota`。
 
 ## 指令速查
 
@@ -66,7 +65,7 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 | 命令 | 功能 |
 |------|------|
-| `/switch [ds\|go\|tr\|cc\|cco\|provider/model]` | 切换模型提供方（`cc` = command-code，`cco` = OAuth 版 commandcode） |
+| `/switch [ds\|go\|tr\|cc\|provider/model]` | 切换模型提供方（`cc`/`cco`/`commandcode` 都是 Command Code） |
 | `/sync-models` | 从 TokenRhythm API 同步最新模型数据 |
 | `/health` | 检查各 provider 的凭据配置与 API 连通性 |
 | `/commandcode-quota` | 查看 Command Code 账号用量与配额（OAuth 版） |
@@ -114,8 +113,8 @@ pi config   # TUI 中启用/禁用包内单个插件，Tab 切换全局/项目�
 
 ## 认证配置
 
-- **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`；Command Code 为 `command-code` 条目 / `COMMAND_CODE_API_KEY`（否则 `/switch go|cc` 会提示没有可用 Key）
-- **pi-commandcode-provider**：用 `/login` 选 Command Code 走 OAuth（凭据存在 `auth.json` 的 `commandcode` 条目）；未登录时 provider 仍会注册但不可用，`/switch cco` 会提示先登录
+- **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`；TokenRhythm 为 `tokenrhythm` 条目 / `TOKENRHYTHM_API_KEY`（否则 `/switch go|tr` 会提示没有可用 Key）
+- **Command Code**：`/login` 选 Command Code 走 OAuth（凭据存在 `auth.json` 的 `commandcode` 条目），或设 `COMMAND_CODE_API_KEY`；未登录时 provider 仍会注册但不可用，`/switch cc` 会提示先登录。`auth.json` 里遗留的 `command-code` 条目已不再被任何 provider 使用
 - **project-memory 云同步**：私有仓库需已配置 git 凭据/代理
 
 ## 开发本仓库

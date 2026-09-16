@@ -281,11 +281,10 @@ export default function (pi: ExtensionAPI) {
     }
 
     // 订阅配额 — 仅当当前 provider 是订阅制（OpenCode Go / Command Code）时显示
-    // Command Code 有两套 provider id：本插件注册的 "command-code"，以及捆绑的
-    // pi-commandcode-provider 注册的 "commandcode"（OAuth /login）。两者同一个账号，
-    // cookie 配额对两者都适用。
+    // Command Code 只有一个 provider id："commandcode"（捆绑的 pi-commandcode-provider）。
+    // 配额走订阅 billing 端点 + 登录 cookie，与 provider 注册方式无关，同一账号通用。
     const prov = ctx.model?.provider ?? "";
-    const isSubscribed = prov === "opencode-go" || prov === "command-code" || prov === "commandcode";
+    const isSubscribed = prov === "opencode-go" || prov === "commandcode";
     if (!isSubscribed) {
       ctx.ui.setStatus("s7", undefined as any);
       return;

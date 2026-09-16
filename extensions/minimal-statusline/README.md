@@ -22,7 +22,7 @@
   - `5h` = 5小时滚动窗口用量
   - `周` = 每周窗口用量
   - `月` = 每月窗口用量
-- **Command Code**（`command-code`）：从 billing 端点拉取（需登录 cookie，auth.json 的 `command-code-cookie` 条目）
+- **Command Code**（`commandcode`）：从 billing 端点拉取（需登录 cookie，存于 `~/.pi/agent/command-code-cookie.txt`）
   - `5h` = 5小时窗口用量（GOAT 上限 $14）
   - `周` = 每周窗口用量（GOAT 上限 $35）
   - `月` = 每月额度已用百分比（GOAT $70/月）

@@ -1,13 +1,15 @@
 /**
  * Provider Switch 插件
  *
- * 在 DeepSeek 直连 / OpenCode Go 订阅 / TokenRhythm（基元律动）之间切换模型。
+ * 在 DeepSeek 直连 / OpenCode Go 订阅 / TokenRhythm（基元律动）/ Command Code 之间切换模型。
  *
  * 用法：
  *   /switch           打开交互选择器
  *   /switch ds        切到 DeepSeek 直连 (deepseek/deepseek-v4-flash)
  *   /switch go        切到 OpenCode Go (opencode-go/deepseek-v4-flash)
  *   /switch tr        切到 TokenRhythm 基元律动 (tokenrhythm/deepseek-v4-flash)
+ *   /switch cc        切到 Command Code（provider id 为 commandcode，由捆绑的
+ *                     pi-commandcode-provider 提供，需先 /login）
  *   /switch deepseek/deepseek-v4-pro   直接切到指定 provider/model
  *
  * 说明：
@@ -15,6 +17,9 @@
  *   - TokenRhythm（基元律动）是国产模型聚合 API，基础地址 https://tokenrhythm.studio/v1，一个 Key 调多家模型
  *   - 大部分模型走 /chat/completions，Qwen/MiniMax 走 /messages，GPT-5.6-Luna 走 /responses
  *   - API Key 存于 auth.json 的 "opencode-go" / "tokenrhythm" 条目
+ *   - Command Code 不再在本插件里注册 provider：早期手写的 "command-code" provider 与
+ *     pi-commandcode-provider 的 "commandcode" 指向同一个上游（api.commandcode.ai/provider/v1）
+ *     却各自维护模型清单，容易混淆且连接不稳，现已统一用上游维护的 commandcode。
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -27,7 +32,6 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   deepseek: "DEEPSEEK_API_KEY",
   "opencode-go": "OPENCODE_API_KEY",
   tokenrhythm: "TOKENRHYTHM_API_KEY",
-  "command-code": "COMMAND_CODE_API_KEY",
   commandcode: "COMMAND_CODE_API_KEY",
 };
 
@@ -62,16 +66,6 @@ const OPTIONS: Array<{ provider: string; model: string; label: string }> = [
   { provider: "tokenrhythm", model: "glm-5.2", label: "TokenRhythm · GLM 5.2" },
   { provider: "tokenrhythm", model: "kimi-k2.7-code", label: "TokenRhythm · Kimi K2.7 Code" },
   { provider: "tokenrhythm", model: "qwen3.7-max", label: "TokenRhythm · Qwen 3.7 Max" },
-  { provider: "command-code", model: "claude-sonnet-5", label: "Command Code · Claude Sonnet 5" },
-  { provider: "command-code", model: "deepseek/deepseek-v4-pro", label: "Command Code · DeepSeek V4 Pro" },
-  { provider: "command-code", model: "deepseek/deepseek-v4-flash", label: "Command Code · DeepSeek V4 Flash" },
-  { provider: "command-code", model: "moonshotai/Kimi-K3", label: "Command Code · Kimi K3" },
-  { provider: "command-code", model: "moonshotai/Kimi-K2.7-Code", label: "Command Code · Kimi K2.7 Code" },
-  { provider: "command-code", model: "zai-org/GLM-5.3", label: "Command Code · GLM 5.3" },
-  { provider: "command-code", model: "Qwen/Qwen3.8-Max", label: "Command Code · Qwen 3.8 Max" },
-  { provider: "command-code", model: "xai/grok-4.6", label: "Command Code · Grok 4.6" },
-  { provider: "command-code", model: "google/gemini-3.7-flash", label: "Command Code · Gemini 3.7 Flash" },
-  { provider: "command-code", model: "MiniMaxAI/MiniMax-M3", label: "Command Code · MiniMax M3" },
 ];
 
 // DeepSeek 官方兼容参数（与 pi 内置 deepseek 一致）
@@ -280,91 +274,6 @@ export default function (pi: ExtensionAPI) {
     ],
   });
 
-  // ── Command Code（GOAT 套餐）provider ────────────────────
-  // 订阅制：$10/月 30+ 模型（Claude/GPT/Gemini/DeepSeek/Kimi/GLM/Qwen 等）
-  // 端点 https://api.commandcode.ai/provider/v1，OpenAI/Anthropic 双兼容
-  // Claude 系列走 /messages（Anthropic 原生），其余走 /chat/completions
-  pi.registerProvider("command-code", {
-    name: "Command Code (GOAT)",
-    baseUrl: "https://api.commandcode.ai/provider/v1",
-    api: "openai-completions",
-    // Key 走 auth.json 的 "command-code" 条目（不设 apiKey 避免 env 依赖）
-    models: [
-      // ── Claude 系列（Anthropic /messages 格式，原生 thinking）──
-      { id: "claude-sonnet-5", name: "CC · Claude Sonnet 5", api: "anthropic-messages", reasoning: true, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 65536 },
-      { id: "claude-opus-5", name: "CC · Claude Opus 5", api: "anthropic-messages", reasoning: true, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 65536 },
-      { id: "claude-haiku-4-5-20251001", name: "CC · Claude Haiku 4.5", api: "anthropic-messages", reasoning: true, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 200000, maxTokens: 32768 },
-
-      // ── GPT 系列 ──
-      { id: "gpt-5.6-luna", name: "CC · GPT-5.6 Luna", reasoning: true, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1050000, maxTokens: 32768 },
-      { id: "gpt-5.6-sol", name: "CC · GPT-5.6 Sol", reasoning: true, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1050000, maxTokens: 32768 },
-      { id: "gpt-5.5", name: "CC · GPT-5.5", reasoning: true, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 400000, maxTokens: 32768 },
-
-      // ── DeepSeek 系列 ──
-      { id: "deepseek/deepseek-v4-pro", name: "CC · DeepSeek V4 Pro", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 384000, compat: OPENAI_COMPAT_SAFE },
-      { id: "deepseek/deepseek-v4-flash", name: "CC · DeepSeek V4 Flash", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 384000, compat: OPENAI_COMPAT_SAFE },
-
-      // ── Kimi 系列 ──
-      { id: "moonshotai/Kimi-K3", name: "CC · Kimi K3", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-      { id: "moonshotai/Kimi-K2.7-Code", name: "CC · Kimi K2.7 Code", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 256000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-
-      // ── GLM 系列 ──
-      { id: "zai-org/GLM-5.3", name: "CC · GLM 5.3", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-      { id: "zai-org/GLM-5.2", name: "CC · GLM 5.2", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-
-      // ── Qwen 系列 ──
-      { id: "Qwen/Qwen3.8-Max", name: "CC · Qwen 3.8 Max", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-      { id: "Qwen/Qwen3.7-Max", name: "CC · Qwen 3.7 Max", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-
-      // ── MiniMax / MiMo ──
-      { id: "MiniMaxAI/MiniMax-M3", name: "CC · MiniMax M3", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-      { id: "xiaomi/mimo-v2.5-pro", name: "CC · MiMo V2.5 Pro", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1000000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-
-      // ── Gemini / Grok / Hy3 ──
-      { id: "google/gemini-3.7-flash", name: "CC · Gemini 3.7 Flash", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 1048576, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-      { id: "xai/grok-4.6", name: "CC · Grok 4.6", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 500000, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-      { id: "tencent/hy3-paid", name: "CC · Tencent Hy3", reasoning: false, input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 262144, maxTokens: 32768, compat: OPENAI_COMPAT_SAFE },
-    ],
-  });
-
   // ── /sync-models 命令 ──────────────────────────────────────
   // 从 TokenRhythm API 拉取最新模型列表，动态更新 provider 注册
   pi.registerCommand("sync-models", {
@@ -484,7 +393,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("switch", {
     description: "在 DeepSeek 直连 / OpenCode Go / TokenRhythm / Command Code 之间切换模型",
     getArgumentCompletions: (prefix) => {
-      const words = ["ds", "go", "tr", "cc", "cco", "deepseek", "opencode-go", "tokenrhythm", "command-code", "commandcode", "cc-oauth"];
+      const words = ["ds", "go", "tr", "cc", "cco", "deepseek", "opencode-go", "tokenrhythm", "commandcode", "cc-oauth"];
       return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
     },
     handler: async (args, ctx) => {
@@ -510,18 +419,15 @@ export default function (pi: ExtensionAPI) {
       } else if (arg === "tr" || arg === "tokenrhythm" || arg === "jiyuan") {
         provider = "tokenrhythm";
         modelId = "deepseek-v4-flash";
-      } else if (arg === "cc" || arg === "command-code" || arg === "goat") {
-        provider = "command-code";
-        modelId = "deepseek/deepseek-v4-flash";
-      } else if (arg === "cco" || arg === "cc-oauth" || arg === "commandcode") {
-        // pi-commandcode-provider（OAuth /login）注册的 provider：模型目录由上游维护、
-        // 随时可能变化，因此动态挑一个默认模型（优先 Sonnet，其次任意有凭据的模型）。
+      } else if (arg === "cc" || arg === "cco" || arg === "cc-oauth" || arg === "commandcode") {
+        // Command Code 只有一条路径：捆绑的 pi-commandcode-provider 注册的 "commandcode"。
+        // 模型目录由上游维护且随时可能变化，因此动态挑一个默认模型（优先 Sonnet）。
         provider = "commandcode";
         const candidates = ctx.modelRegistry.getAvailable().filter((m) => m.provider === provider);
         const preferred = candidates.find((m) => m.id.includes("sonnet")) ?? candidates[0];
         if (!preferred) {
           ctx.ui.notify(
-            "没有可用的 commandcode 模型：请先 /login 选择 Command Code，或设置 COMMAND_CODE_API_KEY",
+            "没有可用的 Command Code 模型：请先 /login 选择 Command Code，或设置 COMMAND_CODE_API_KEY",
             "error",
           );
           return;
@@ -557,9 +463,8 @@ export default function (pi: ExtensionAPI) {
     description: "检查各 provider 的认证与连通性",
     handler: async (_args, ctx) => {
       const lines: string[] = ["🔍 Provider 健康检查\n"];
-      // commandcode = pi-commandcode-provider（OAuth /login）注册的 provider；
-      // command-code = 本插件注册的 provider。同一个 Command Code 账号的两条接入路径。
-      const providers = ["deepseek", "opencode-go", "tokenrhythm", "command-code", "commandcode"];
+      // commandcode = 捆绑的 pi-commandcode-provider（OAuth /login）注册的 provider
+      const providers = ["deepseek", "opencode-go", "tokenrhythm", "commandcode"];
 
       // 1. 凭据来源：auth.json → 环境变量 → modelRegistry（涵盖 /login OAuth 凭据）
       //    只看 auth.json 会把用环境变量或登录方式配置的 provider 误报为未配置。
@@ -588,7 +493,7 @@ export default function (pi: ExtensionAPI) {
         }
       }
 
-      // 2. command-code cookie
+      // 2. command-code cookie（订阅配额显示用；早于 OAuth 接入时代遗留的登录 cookie）
       const cookie = await readCcCookie();      if (cookie) {
         // 粗略检查 session_token 是否还在
         const hasToken = cookie.includes("session_token");
@@ -603,7 +508,6 @@ export default function (pi: ExtensionAPI) {
         ["deepseek", "https://api.deepseek.com/v1/models"],
         ["opencode-go", "https://opencode.ai/zen/go/v1/models"],
         ["tokenrhythm", "https://tokenrhythm.studio/v1/models"],
-        ["command-code", "https://api.commandcode.ai/provider/v1/models"],
         ["commandcode", "https://api.commandcode.ai/provider/v1/models"],
       ];
       for (const [prov, url] of tests) {
