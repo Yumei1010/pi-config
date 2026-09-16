@@ -15,12 +15,13 @@ GIT_SOURCE="git:github.com/Yumei1010/pi-config"
 EXT_DIR="$HOME/.pi/agent/extensions"
 
 # 本仓库提供的自定义插件（用于清理旧版复制副本）
-OWN_EXTENSIONS=(claude-md-loader command-chinese conventions-review minimal-statusline project-memory provider-switch)
+OWN_EXTENSIONS=(claude-md-loader command-chinese conventions-review minimal-statusline project-memory provider-switch auto-git-context session-auto-name session-tags)
 
 # 旧版单独安装的依赖包（现已随本包捆绑）
 LEGACY_PACKAGES=(
   "npm:pi-web-access"
   "npm:pi-mcp-adapter"
+  "npm:pi-commandcode-provider"
   "npm:@narumitw/pi-btw"
   "npm:@narumitw/pi-caffeinate"
   "npm:@narumitw/pi-chrome-devtools"
@@ -49,7 +50,7 @@ migrate=0
 for d in "${OWN_EXTENSIONS[@]}"; do
   [ -d "$EXT_DIR/$d" ] && migrate=1 && break
 done
-if [ "$migrate" = "0" ] && pi list 2>/dev/null | grep -q "@narumitw/pi-goal"; then migrate=1; fi
+if [ "$migrate" = "0" ] && pi list 2>/dev/null | grep -qE "@narumitw/pi-goal|pi-commandcode-provider"; then migrate=1; fi
 
 if [ "$migrate" = "1" ]; then
   echo "检测到旧版安装，开始迁移（避免重复加载）…"
@@ -69,14 +70,14 @@ if [ "$migrate" = "1" ]; then
     fi
   done
 
-  # 2c) 清理 settings.json 中旧版平铺插件条目（仅移除本仓库的 6 个，保留其他）
+  # 2c) 清理 settings.json 中旧版平铺插件条目（仅移除本仓库自带的插件，保留其他）
   node -e '
     const fs = require("fs"), path = require("path"), os = require("os");
     const p = path.join(os.homedir(), ".pi", "agent", "settings.json");
     try {
       const s = JSON.parse(fs.readFileSync(p, "utf8"));
       if (!Array.isArray(s.extensions)) process.exit(0);
-      const stale = new Set(["claude-md-loader.ts", "command-chinese.ts", "conventions-review.ts", "minimal-statusline.ts", "project-memory.ts", "provider-switch.ts"]);
+      const stale = new Set(["claude-md-loader.ts", "command-chinese.ts", "conventions-review.ts", "minimal-statusline.ts", "project-memory.ts", "provider-switch.ts", "auto-git-context.ts", "session-auto-name.ts", "session-tags.ts"]);
       const kept = s.extensions.filter((e) => !stale.has(path.win32.basename(String(e))));
       if (kept.length !== s.extensions.length) {
         s.extensions = kept;
@@ -87,4 +88,5 @@ if [ "$migrate" = "1" ]; then
   '
 fi
 
+# ── 3. 自检 ────────────────────────────────────────────────
 echo "=== 完成 === 运行 pi 然后输入 /reload"

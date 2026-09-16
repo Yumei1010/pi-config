@@ -1,6 +1,6 @@
 # Pi 开发环境配置
 
-本仓库是一个 **pi package**：9 个自定义插件 + 15 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
+本仓库是一个 **pi package**：9 个自定义插件 + 16 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
 
 ## 安装
 
@@ -43,8 +43,22 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 - 13 个 Narumiruna 插件：goal / plan-mode / subagents / firecrawl / lsp / google-genai / chrome-devtools / github-pr / retry / sync / btw / caffeinate / wait-what
 - pi-web-access / pi-mcp-adapter（含 mcp-scripting skill）
+- pi-commandcode-provider（Command Code OAuth 登录版 provider，见下方「两套 Command Code 接入」）
 
 依赖版本在 `package.json` 中精确锁定。升级方式：改版本号 → `npm install` → 提交推送 → 各机器执行 `pi update --extensions`。
+
+### 刻意锁定不升级的依赖
+
+- **`@narumitw/pi-subagents` 锁在 1.0.2**。上游 2.x/3.x 是推倒重写：`subagent_auto`（自主工作流规划）在 2.0 被移除，3.0 起只剩 `subagent_spawn/inspect/cancel/wait/send` 五个工具并删掉 `/subagents` 命令，`subagent`（workflow / panel / verifiedExecution）、`subagent_consult`、`subagent_mailbox`、`subagent_manage` 全部消失。本环境依赖 1.0.2 的委派套件，所以在升级前先对比工具表，别只看 `npm outdated` 的版本号。
+
+### 两套 Command Code 接入
+
+| provider id | 来源 | 登录方式 | 用途 |
+|---|---|---|---|
+| `command-code` | 本仓库 `provider-switch` | `auth.json` 的 `command-code` 条目 / `COMMAND_CODE_API_KEY` | 手写模型清单，`/switch cc` |
+| `commandcode` | pi-commandcode-provider | `/login` 选 Command Code（OAuth） | 上游维护的模型目录，`/switch cco` |
+
+两者共用同一个账号，状态栏的订阅配额（cookie）对两者都生效；`/health` 也同时检查两者（会忽略未配置时返回的 `$COMMAND_CODE_API_KEY` 占位值）。
 
 ## 指令速查
 
@@ -52,9 +66,12 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 | 命令 | 功能 |
 |------|------|
-| `/switch [ds\|go\|tr\|cc\|provider/model]` | 切换模型提供方（DeepSeek/Go/TokenRhythm/Command Code） |
+| `/switch [ds\|go\|tr\|cc\|cco\|provider/model]` | 切换模型提供方（`cc` = command-code，`cco` = OAuth 版 commandcode） |
 | `/sync-models` | 从 TokenRhythm API 同步最新模型数据 |
-| `/health` | 检查各 provider 的 key 配置与 API 连通性 |
+| `/health` | 检查各 provider 的凭据配置与 API 连通性 |
+| `/commandcode-quota` | 查看 Command Code 账号用量与配额（OAuth 版） |
+| `/commandcode-status` | 查看 Command Code provider 诊断信息 |
+| `/commandcode-refresh` | 刷新 Command Code 模型目录 |
 | `/memory [global\|save\|clear\|cloud …]` | 两级记忆管理 + 云同步 |
 | `/conventions [--all\|--staged\|路径]` | GFramework 代码规范审查 |
 | `/all` | 全部指令 + 中文说明一览 |
@@ -98,6 +115,7 @@ pi config   # TUI 中启用/禁用包内单个插件，Tab 切换全局/项目�
 ## 认证配置
 
 - **provider-switch**：OpenCode Go 的 API Key 需配置在 `auth.json` 的 `opencode-go` 条目，或设置环境变量 `OPENCODE_API_KEY`；Command Code 为 `command-code` 条目 / `COMMAND_CODE_API_KEY`（否则 `/switch go|cc` 会提示没有可用 Key）
+- **pi-commandcode-provider**：用 `/login` 选 Command Code 走 OAuth（凭据存在 `auth.json` 的 `commandcode` 条目）；未登录时 provider 仍会注册但不可用，`/switch cco` 会提示先登录
 - **project-memory 云同步**：私有仓库需已配置 git 凭据/代理
 
 ## 开发本仓库
@@ -126,10 +144,11 @@ pi update --models         # 刷新模型目录（/model 列表）
 
 1. **类型检查**：`npm run typecheck` 必须 0 错误（CI 也会跑）
 2. **依赖漂移**：devDependencies 的 `@earendil-works/*` 应跟随本机 `pi --version`；升级后重跑 typecheck
-3. **捆绑插件升级**：`npm outdated` 有新版 → 改 `package.json` 精确版本号 → `npm install` → `npm run typecheck` → 提交推送 → 各机器 `pi update --extensions`
+3. **捆绑插件升级**：`npm outdated` 有新版 → **先确认上游没换设计**（对比工具/命令表，如 pi-subagents 2.x/3.x 删掉了整个委派套件）→ 改 `package.json` 精确版本号 → `npm install` → 校验 `pi.extensions` 里的入口路径仍存在（上游可能把入口从 `src/index.ts` 改成 `dist/index.ts`）→ `npm run typecheck` → `pi --list-models --offline` 看插件是否报错 → 提交推送 → 各机器 `pi update --extensions`
 4. **插件升级后补汉化**：Narumiruna 系列升级后跑 `/all`，看是否有新子命令落到英文（需补 `extensions/command-chinese/index.ts` 的 `SUB_CN_MAP`）
 5. **状态栏配额**：显示 `配额 --` 时先看 `command-code-cookie.txt` 的 `session_token` 是否过期，再运行 `/health`
 6. **认证体检**：`/health` 全绿；`git status` 干净、本地不落后 origin
+7. **入口路径**：`node -e "const d=require('./package.json');console.log(d.pi.extensions.filter(p=>!require('fs').existsSync(p)))"` 应输出 `[]`
 
 ## 从旧版迁移（复制安装时代）
 

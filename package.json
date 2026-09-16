@@ -1,7 +1,7 @@
 {
   "name": "pi-config",
   "version": "1.0.0",
-  "description": "Yumei 的 Pi 开发环境：6 个自定义扩展 + 15 个依赖插件，一条命令复刻",
+  "description": "Yumei 的 Pi 开发环境：9 个自定义扩展 + 16 个依赖插件，一条命令复刻",
   "private": true,
   "type": "module",
   "keywords": [
@@ -16,6 +16,7 @@
       "extensions",
       "node_modules/pi-web-access/index.ts",
       "node_modules/pi-mcp-adapter/index.ts",
+      "node_modules/pi-commandcode-provider/index.ts",
       "node_modules/@narumitw/pi-btw/src/index.ts",
       "node_modules/@narumitw/pi-caffeinate/src/index.ts",
       "node_modules/@narumitw/pi-chrome-devtools/src/index.ts",
@@ -46,11 +47,12 @@
     "@narumitw/pi-goal": "0.54.5",
     "@narumitw/pi-google-genai": "0.49.3",
     "@narumitw/pi-lsp": "0.49.7",
-    "@narumitw/pi-plan-mode": "0.49.3",
+    "@narumitw/pi-plan-mode": "0.58.0",
     "@narumitw/pi-retry": "0.31.0",
     "@narumitw/pi-subagents": "1.0.2",
     "@narumitw/pi-sync": "0.51.0",
     "@narumitw/pi-wait-what": "0.13.1",
+    "pi-commandcode-provider": "0.7.0",
     "pi-mcp-adapter": "2.34.0",
     "pi-web-access": "0.29.0"
   },

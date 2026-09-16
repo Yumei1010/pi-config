@@ -13,12 +13,13 @@ $GitSource = "git:github.com/Yumei1010/pi-config"
 $ExtDir = "$env:USERPROFILE\.pi\agent\extensions"
 
 # 本仓库提供的自定义插件（用于清理旧版复制副本）
-$OwnExtensions = @("claude-md-loader", "command-chinese", "conventions-review", "minimal-statusline", "project-memory", "provider-switch")
+$OwnExtensions = @("claude-md-loader", "command-chinese", "conventions-review", "minimal-statusline", "project-memory", "provider-switch", "auto-git-context", "session-auto-name", "session-tags")
 
 # 旧版单独安装的依赖包（现已随本包捆绑）
 $LegacyPackages = @(
   "npm:pi-web-access",
   "npm:pi-mcp-adapter",
+  "npm:pi-commandcode-provider",
   "npm:@narumitw/pi-btw",
   "npm:@narumitw/pi-caffeinate",
   "npm:@narumitw/pi-chrome-devtools",
@@ -49,7 +50,7 @@ $migrate = $false
 foreach ($d in $OwnExtensions) {
   if (Test-Path (Join-Path $ExtDir $d)) { $migrate = $true; break }
 }
-if (-not $migrate -and $installed -match "@narumitw/pi-goal") { $migrate = $true }
+if (-not $migrate -and $installed -match "@narumitw/pi-goal|pi-commandcode-provider") { $migrate = $true }
 
 if ($migrate) {
   Write-Host "检测到旧版安装，开始迁移（避免重复加载）…"
@@ -69,14 +70,14 @@ if ($migrate) {
     }
   }
 
-  # 2c) 清理 settings.json 中旧版平铺插件条目（仅移除本仓库的 6 个，保留其他）
+  # 2c) 清理 settings.json 中旧版平铺插件条目（仅移除本仓库自带的插件，保留其他）
   node -e '
     const fs = require("fs"), path = require("path"), os = require("os");
     const p = path.join(os.homedir(), ".pi", "agent", "settings.json");
     try {
       const s = JSON.parse(fs.readFileSync(p, "utf8"));
       if (!Array.isArray(s.extensions)) process.exit(0);
-      const stale = new Set(["claude-md-loader.ts", "command-chinese.ts", "conventions-review.ts", "minimal-statusline.ts", "project-memory.ts", "provider-switch.ts"]);
+      const stale = new Set(["claude-md-loader.ts", "command-chinese.ts", "conventions-review.ts", "minimal-statusline.ts", "project-memory.ts", "provider-switch.ts", "auto-git-context.ts", "session-auto-name.ts", "session-tags.ts"]);
       const kept = s.extensions.filter((e) => !stale.has(path.win32.basename(String(e))));
       if (kept.length !== s.extensions.length) {
         s.extensions = kept;
