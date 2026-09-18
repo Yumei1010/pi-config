@@ -1,402 +1,598 @@
 /**
  * 浏览器用量面板的前端（单文件 HTML，无外部依赖）
  *
- * 配色直接取自 commandcode.ai 网页端的深色主题变量（从它的 root CSS 里抓的）：
- *   --background #000 · --card #09090b · --muted #18181b · --secondary/--accent #27272a
- *   --border #222225 / --border-muted #232324 · --foreground #fafafa · --muted-foreground #a1a1aa
- *   --brand #556af3 · --brand-text #556af3 · --danger #d1242f · --warning #d1aa24 · --success #22c55e
+ * 视觉语言照着 commandcode.ai 的 usage 页面做，关键数值都是从它网页端的编译后 CSS /
+ * SSR DOM 里抠出来的，不是凭感觉调的：
+ *   --radius: 0px          整套直角系统（这是最大的观感差异）
+ *   --spacing: .25rem      Tailwind 间距刻度（p-5 = 20px、px-4 = 16px、py-3 = 12px、gap-4 = 16px）
+ *   --text-xs .75rem / --text-sm .875rem / --text-base 1rem / --text-2xl 1.5rem
+ *   --tracking-wide .025em / --tracking-wider .05em
+ *   深色令牌：--background #000 · --card #09090b · --muted #18181b · --secondary #27272a
+ *            --border #222225 · --border-muted #232324 · --muted-foreground #a1a1aa
+ *            --brand #556af3 · --danger #d1242f · --warning #d1aa24 · --success #22c55e
+ *   组件语言：`//` 前缀的小节标题、四角刻度方块（size-1.5/2 偏移 3px/4px）、
+ *            等宽大写小标签、大号数值 + 小号单位、柱状迷你图（透明度 0.35→1 递进）、
+ *            表头 uppercase tracking-wider + tbody divide-y divide-border
+ *   字体：Geist / Geist Mono（由本机服务从 commandcode.ai 取回并缓存，取不到自动回退系统字体）
  *
- * 页面从本机 pi 扩展起的服务拉数据：GET {base}/api/snapshot?days=N
- * 认证靠 URL 路径里的随机 token（`__TOKEN__` 占位符由服务端替换）。
+ * 数据来自本机服务：GET {base}/api/snapshot?days=N（base 形如 /d/<token>）
  */
 
 /** 生成面板 HTML；base 形如 `/d/<token>` */
 export function dashboardHtml(base: string): string {
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>用量面板 · Command Code & DeepSeek</title>
+<title>Usage · 用量面板</title>
 <style>
+@font-face{font-family:Geist;font-style:normal;font-weight:100 900;font-display:swap;src:url(${base}/font/geist.woff2)format("woff2")}
+@font-face{font-family:"Geist Mono";font-style:normal;font-weight:100 900;font-display:swap;src:url(${base}/font/geist-mono.woff2)format("woff2")}
 :root{
-  --background:#000; --foreground:#fafafa; --card:#09090b; --popover:#09090b;
-  --muted:#18181b; --muted-foreground:#a1a1aa; --secondary:#27272a; --accent:#27272a;
-  --border:#222225; --border-muted:#232324; --input:#27272a; --ring:#d4d4d8;
-  --primary:#fafafa; --primary-foreground:#18181b;
-  --brand:#556af3; --brand-deep:#2e1b9c; --brand-text:#556af3;
-  --danger:#d1242f; --warning:#d1aa24; --success:#22c55e; --info:#3b82f6;
-  --radius:12px;
+  --background:#000; --foreground:#fafafa; --card:#09090b;
+  --muted:#18181b; --secondary:#27272a; --muted-foreground:#a1a1aa;
+  --border:#222225; --border-muted:#232324;
+  --sidebar:#18181b; --sidebar-accent:#27272a; --sidebar-border:#27272a;
+  --brand:#556af3; --brand-soft:#556af31f;
+  --danger:#d1242f; --warning:#d1aa24; --success:#22c55e;
+  --radius:0px; --spacing:.25rem;
+  --font-sans:Geist,"Geist Fallback",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  --font-mono:"Geist Mono","Cascadia Code",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{
-  background:var(--background); color:var(--foreground);
-  font:14px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--background);color:var(--foreground);
+  font-family:var(--font-sans);font-size:var(--text-base,1rem);line-height:1.5;
   -webkit-font-smoothing:antialiased;
 }
-a{color:var(--brand)}
-.layout{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
-/* ── 侧栏 ── */
-.sidebar{background:var(--muted);border-right:1px solid var(--border);padding:18px 14px;display:flex;flex-direction:column;gap:6px}
-.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
-.brand-mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));box-shadow:0 0 0 1px #ffffff14}
-.brand-text{font-weight:600;letter-spacing:.2px}
-.brand-sub{color:var(--muted-foreground);font-size:11px}
-.nav-item{
-  display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding:9px 11px;border-radius:9px;color:var(--muted-foreground);cursor:pointer;
-  border:1px solid transparent;background:none;font:inherit;text-align:left;width:100%;
-}
-.nav-item:hover{background:var(--secondary);color:var(--foreground)}
-.nav-item.active{background:var(--secondary);color:var(--foreground);border-color:var(--border)}
-.nav-dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
-.nav-dot.warn{background:var(--warning)}
-.nav-dot.err{background:var(--danger)}
-.sidebar-foot{margin-top:auto;color:var(--muted-foreground);font-size:11px;line-height:1.7;padding:8px}
-.sidebar-foot code{background:var(--secondary);padding:1px 5px;border-radius:5px;font-size:10.5px}
-/* ── 主体 ── */
-.main{padding:22px 26px 40px;min-width:0}
-.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.2px}
-.sub{color:var(--muted-foreground);font-size:12.5px;margin-top:4px}
-.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.seg{display:flex;background:var(--muted);border:1px solid var(--border);border-radius:9px;overflow:hidden}
-.seg button{background:none;border:0;color:var(--muted-foreground);padding:7px 12px;font:inherit;cursor:pointer}
-.seg button:hover{color:var(--foreground)}
-.seg button.active{background:var(--secondary);color:var(--foreground)}
-.btn{
-  display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:var(--primary-foreground);
-  border:0;border-radius:9px;padding:8px 13px;font:inherit;font-weight:500;cursor:pointer;
-}
-.btn:hover{opacity:.9}
-.btn.ghost{background:var(--muted);color:var(--foreground);border:1px solid var(--border)}
-.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);margin:22px 0 10px}
-.grid{display:grid;gap:12px}
-.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px}
-.kpi .label{color:var(--muted-foreground);font-size:12px}
-.kpi .value{font-size:23px;font-weight:600;margin-top:6px;letter-spacing:.2px}
-.kpi .foot{color:var(--muted-foreground);font-size:11.5px;margin-top:4px}
-.two{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
-@media(max-width:860px){
-  .layout{grid-template-columns:1fr}
-  .sidebar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px;border-right:0;border-bottom:1px solid var(--border)}
-  .brand{padding:0 4px 0 0}
-  .brand-sub{display:none}
-  .nav-item{width:auto;padding:7px 12px}
-  .sidebar-foot{margin:0;padding:4px 0 0;width:100%}
-  .two{grid-template-columns:1fr}
-  .main{padding:18px 16px 32px}
-}
-.bars{display:flex;flex-direction:column;gap:12px}
-.bar-row{display:flex;align-items:center;gap:12px}
-.bar-label{width:52px;color:var(--muted-foreground);font-size:12px}
-.bar-track{flex:1;height:7px;background:var(--secondary);border-radius:99px;overflow:hidden}
-.bar-fill{height:100%;border-radius:99px}
-.bar-value{min-width:196px;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted-foreground)}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.table-wrap{overflow:auto;max-height:460px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
-th,td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border-muted)}
-th{position:sticky;top:0;background:var(--card);color:var(--muted-foreground);font-size:11px;text-transform:uppercase;letter-spacing:.06em;z-index:1}
-tbody tr:hover{background:var(--muted)}
-td.num,th.num{text-align:right}
-.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--muted-foreground)}
-.tag.ok{color:var(--success);border-color:#22c55e3d;background:#22c55e14}
-.tag.fail{color:var(--danger);border-color:#d1242f3d;background:#d1242f14}
-.mono{font-family:ui-monospace,SFMono-Regular,"JetBrains Mono",Menlo,monospace;font-size:12.5px}
+.mono{font-family:var(--font-mono);font-feature-settings:"ss02","ss03"}
 .muted{color:var(--muted-foreground)}
-.banner{border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;border:1px solid var(--border);background:var(--muted);color:var(--muted-foreground);font-size:12.5px;line-height:1.75}
-.banner.warn{border-color:#d1aa2459;background:#d1aa2414;color:#e8d199}
-.banner.err{border-color:#d1242f59;background:#d1242f14;color:#f0a9ad}
-.spark{display:block}
-.empty{color:var(--muted-foreground);padding:16px;text-align:center;font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--brand)}
+
+/* ── 布局 ── */
+.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:8px;gap:8px;position:sticky;top:0;align-self:start;height:100vh;overflow:auto}
+.brand{height:64px;display:flex;align-items:center;gap:10px;padding:0 16px}
+.brand-mark{width:26px;height:26px;border:1px solid var(--border);background:var(--sidebar-accent);display:grid;place-items:center;color:var(--brand)}
+.brand-name{font-size:.9375rem;font-weight:600;letter-spacing:-.01em}
+.nav{display:flex;flex-direction:column;gap:8px;padding:8px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;width:100%;padding:8px;border:1px solid transparent;
+  background:none;color:var(--muted-foreground);font:600 .875rem/1.5 var(--font-sans);text-align:left;cursor:pointer;
+}
+.nav-item > span:first-of-type{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-item:hover{background:var(--sidebar-accent);color:var(--foreground)}
+.nav-item.active{background:var(--sidebar-accent);border-color:var(--border);color:var(--foreground)}
+.nav-state{font:400 .6875rem var(--font-mono);color:var(--muted-foreground);white-space:nowrap}
+.nav-item.active .nav-state{color:var(--foreground);opacity:.75}
+.nav-spacer{flex:0 0 auto;display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;background:var(--success)}
+.dot.warn{background:var(--warning)}
+.dot.err{background:var(--danger)}
+.side-foot{margin-top:auto;padding:8px 12px;color:var(--muted-foreground);font-size:.6875rem;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-foot code{font-family:var(--font-mono);font-size:.625rem;color:var(--foreground);background:var(--secondary);padding:1px 4px}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 24px;border-bottom:1px solid var(--border)}
+.topbar h1{margin:0;font-size:1.625rem;font-weight:600;letter-spacing:-.02em;line-height:1.3}
+.topbar .sub{color:var(--muted-foreground);font-size:.75rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:600px}
+.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.content{padding:28px 24px 40px}
+.content-inner{max-width:1600px;margin:0 auto}
+
+/* ── 分段按钮 / 普通按钮（直角） ── */
+.seg{display:flex}
+.seg button{
+  height:36px;padding:0 12px;border:1px solid var(--border);border-left:0;background:var(--background);
+  color:var(--muted-foreground);font:500 .75rem var(--font-mono);text-transform:uppercase;letter-spacing:.05em;cursor:pointer;
+  font-feature-settings:"ss02","ss03";
+}
+.seg button:first-child{border-left:1px solid var(--border)}
+.seg button:hover{color:var(--foreground);background:var(--muted)}
+.seg button.active{background:var(--secondary);color:var(--foreground)}
+.seg[data-disabled="1"]{opacity:.3;filter:grayscale(1)}
+.seg[data-disabled="1"] button{cursor:not-allowed}
+.btn{
+  height:36px;display:inline-flex;align-items:center;gap:8px;padding:0 12px;border:1px solid var(--border);
+  background:var(--background);color:var(--foreground);font:500 .75rem var(--font-mono);text-transform:uppercase;
+  letter-spacing:.05em;cursor:pointer;
+}
+.btn:hover{background:var(--muted)}
+.btn.primary{background:var(--secondary);color:var(--foreground);border-color:var(--border)}
+.btn.quiet{color:var(--muted-foreground)}
+.btn.quiet.on{color:var(--foreground)}
+
+/* ── 小节 ── */
+.section{margin-bottom:48px}
+.section-h{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.section-h h2{margin:0;font-size:1rem;font-weight:600;line-height:1.75rem;display:flex;align-items:center;gap:8px}
+.section-h h2 .slash{color:var(--muted-foreground);opacity:.6;letter-spacing:-.2em}
+.section-h .meta{display:flex;align-items:center;gap:8px;color:var(--muted-foreground);font:400 .75rem var(--font-mono)}
+.pill{display:inline-block;padding:3px 8px;border:1px solid var(--border);font:500 .6875rem var(--font-mono);color:var(--foreground)}
+.pill.hot{border-color:#d1242f;background:#d1242f1f;color:#f4a3a7}
+
+/* ── 卡片：直角 + 四角刻度 ── */
+.card{position:relative;background:var(--background);border:1px solid var(--border);padding:16px 20px}
+.card.fill{background:var(--card)}
+.tick{position:absolute;z-index:10;background:var(--muted);border:1px solid var(--border);width:6px;height:6px}
+.tick.tl{top:0;left:0;transform:translate(-5px,-5px)}
+.tick.tr{top:0;right:0;transform:translate(5px,-5px)}
+.tick.bl{bottom:0;left:0;transform:translate(-5px,5px)}
+.tick.br{bottom:0;right:0;transform:translate(5px,5px)}
+.card.big .tick{width:8px;height:8px}
+.card.big .tick.tl{transform:translate(-4px,-4px)}
+.card.big .tick.tr{transform:translate(4px,-4px)}
+.card.big .tick.bl{transform:translate(-4px,4px)}
+.card.big .tick.br{transform:translate(4px,4px)}
+
+.grid{display:grid;gap:20px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:stretch}
+.split{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:stretch}
+@media(max-width:1080px){.split{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:860px){
+  .layout{grid-template-columns:minmax(0,1fr);height:auto}
+  .sidebar{border-right:0;border-bottom:1px solid var(--border);flex-direction:row;flex-wrap:wrap;align-items:center}
+  .brand{height:auto;padding:8px 12px}
+  .nav{flex-direction:row;padding:4px;gap:4px}
+  .nav-item{width:auto}
+  .side-foot{display:none}
+}
+
+/* ── 指标卡 ── */
+.kpi-label{display:flex;align-items:center;gap:8px;font:400 .75rem var(--font-mono);text-transform:uppercase;letter-spacing:.025em;color:var(--muted-foreground)}
+.kpi-label svg{width:16px;height:16px;color:var(--muted-foreground)}
+.kpi-value{display:flex;align-items:baseline;gap:6px;margin:10px 0 14px}
+.kpi-value b{font-variant-numeric:tabular-nums;font-size:1.75rem;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi-value span{font-size:.8125rem;color:var(--muted-foreground)}
+.kpi-note{margin-top:auto;font:400 .6875rem var(--font-mono);color:var(--muted-foreground)}
+.bars{margin-top:auto;display:flex;align-items:flex-end;gap:2px;height:26px;border-bottom:1px solid var(--border-muted);padding-bottom:1px}
+.bars i{flex:1;min-width:2px;background:var(--muted-foreground);display:block}
+.bars i.hi{background:var(--brand)}
+.meter{margin-top:auto;height:6px;background:var(--muted);border:1px solid var(--border)}
+.meter i{display:block;height:100%}
+.kpi-value b.soft{font-size:1rem;font-weight:500;color:var(--muted-foreground)}
+
+/* ── 额度条 ── */
+.limits{display:flex;flex-direction:column;justify-content:space-between;gap:24px;flex:1}
+.limit-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:12px}
+.limit-top .name{font:400 .75rem var(--font-mono);text-transform:uppercase;letter-spacing:.025em;color:var(--muted-foreground)}
+.limit-top .val{font:400 .75rem var(--font-mono);color:var(--muted-foreground);font-feature-settings:"ss02","ss03"}
+.limit-top .val b{font-weight:600;color:var(--foreground)}
+.limit-top .val b.hot{color:#f87171}
+.limit.hot{background:rgba(209,36,47,.06);border-left:2px solid var(--danger);padding-left:8px}
+.track{height:6px;background:var(--secondary);border:1px solid var(--border);position:relative}
+.track i{display:block;height:100%}
+.limit-foot{margin-top:6px;font:400 .6875rem var(--font-mono);color:var(--muted-foreground)}
+
+/* ── 表格 ── */
+.table-wrap{overflow-x:auto;max-height:520px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{
+  position:sticky;top:0;background:var(--card);padding:11px 16px;text-align:left;
+  font:500 .75rem var(--font-sans);text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);
+  border-bottom:1px solid var(--border);white-space:nowrap;
+}
+thead th.r, tbody td.r{width:104px}
+thead th.r{text-align:right}
+tbody td{padding:11px 16px;font-size:.875rem;border-top:1px solid var(--border-muted);white-space:nowrap}
+tbody td.r{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:hover td{background:var(--muted)}
+tbody td.model{font-family:var(--font-mono);font-size:.8125rem;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.badge{display:inline-block;padding:2px 6px;border:1px solid var(--border);font:500 .6875rem var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground)}
+.badge.ok{color:var(--success);border-color:#22c55e59}
+.badge.fail{color:var(--danger);border-color:#d1242f59}
+.empty{padding:16px;color:var(--muted-foreground);font-size:.8125rem}
+.empty-row td{background:none}
+.empty-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-link{background:none;border:0;padding:0;color:var(--warning);font:400 .75rem var(--font-mono);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* ── 频率柱状图行 ── */
+.freq-row{display:flex;align-items:center;gap:16px;padding:10px 0;border-top:1px solid var(--border-muted)}
+.freq-row:first-child{border-top:0}
+.freq-name{font-family:var(--font-mono);font-size:.8125rem;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.freq-meta{font:400 .6875rem var(--font-mono);color:var(--muted-foreground);white-space:nowrap}
+.freq-bars{display:flex;align-items:flex-end;gap:2px;height:22px;width:180px;flex:none}
+.freq-bars i{flex:1;min-width:1px;background:var(--brand);opacity:.85;display:block}
+
+/* ── 提示 ── */
+.banner{position:relative;border:1px solid var(--border);background:var(--muted);padding:12px 16px;margin-bottom:16px;font-size:.8125rem;color:var(--muted-foreground);line-height:1.7;overflow-wrap:anywhere}
+.banner b{color:var(--foreground);font-weight:600}
+.banner .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.banner .path{font-family:var(--font-mono);font-size:.6875rem;color:var(--foreground);word-break:break-all}
+.banner-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.banner-title{color:var(--warning);font-weight:600}
+.banner-more{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.table-wrap.empty-mode thead{display:none}
+.table-wrap.empty-mode .empty-actions{justify-content:center;padding:44px 0}
+.banner.warn{border-color:#d1aa2459;background:#d1aa240f;color:#e6d29a}
+.banner.err{border-color:#d1242f59;background:#d1242f0f;color:#efa6aa}
+.banner code{font-family:var(--font-mono);font-size:.75rem;color:var(--foreground)}
+.skeleton{background:var(--muted);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
 .hidden{display:none}
-.plan-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;background:#556af31f;color:#a9b4ff;border:1px solid #556af34d;font-size:12px}
 </style>
 </head>
-<body data-api="__BASE__">
+<body data-api="${base}">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-mark"></div>
+      <div class="brand-mark">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 18V6h3l5 8 5-8h3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/>
+        </svg>
+      </div>
       <div>
-        <div class="brand-text">用量面板</div>
-        <div class="brand-sub">Command Code · DeepSeek</div>
+        <div class="brand-name">Usage</div>
+        <div class="muted" style="font-size:.6875rem;font-family:var(--font-mono)">CC · DeepSeek</div>
       </div>
     </div>
-    <button class="nav-item active" data-tab="cc"><span>Command Code</span><span class="nav-dot" id="dot-cc"></span></button>
-    <button class="nav-item" data-tab="ds"><span>DeepSeek 官方</span><span class="nav-dot" id="dot-ds"></span></button>
-    <nav class="nav-item" id="go-cc-quota"><span>额度与套餐</span><span class="muted">↑</span></nav>
-    <div class="sidebar-foot">
-      数据来自 pi 扩展 <code>usage-dashboard</code><br>
-      凭据：<code>command-code-cookie.txt</code><br>
-      <code>auth.json</code> / <code>deepseek-platform-token.txt</code>
-    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-tab="cc">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" stroke="currentColor" stroke-linecap="square"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-linecap="square"/></svg>
+        <span>Command Code</span><span class="nav-spacer"><span class="nav-state" id="state-cc">—</span><i class="dot" id="dot-cc" title="Command Code 数据状态"></i></span>
+      </button>
+      <button class="nav-item" data-tab="ds">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-linecap="square"/><path d="M12 7.5v9M9 10.5h4.5a1.5 1.5 0 0 1 0 3H9" stroke="currentColor" stroke-linecap="square"/></svg>
+        <span>DeepSeek 官方</span><span class="nav-spacer"><span class="nav-state" id="state-ds">—</span><i class="dot" id="dot-ds" title="DeepSeek 数据状态"></i></span>
+      </button>
+    </nav>
+    <div class="side-foot" title="Command Code cookie + DeepSeek API key / userToken">数据源 · CC cookie + DeepSeek key</div>
   </aside>
 
-  <main class="main">
+  <div class="main">
     <div class="topbar">
       <div>
-        <h1>用量</h1>
+        <h1>Usage</h1>
         <div class="sub" id="subtitle">正在加载…</div>
       </div>
       <div class="controls">
         <div class="seg" id="range">
-          <button data-days="1">1 天</button>
-          <button data-days="7" class="active">7 天</button>
-          <button data-days="30">30 天</button>
+          <button data-days="1">1D</button>
+          <button data-days="7" class="active">7D</button>
+          <button data-days="30">30D</button>
         </div>
-        <button class="btn ghost" id="refresh">刷新</button>
-        <button class="btn ghost" id="auto">自动刷新：开</button>
+        <button class="btn" id="auto">AUTO ◉</button>
+        <button class="btn primary" id="refresh">刷新</button>
       </div>
     </div>
 
-    <div id="banners"></div>
+    <div class="content">
+      <div class="content-inner">
+      <div id="banners"></div>
 
-    <!-- ── Command Code ── -->
-    <section id="view-cc">
-      <div class="grid kpis">
-        <div class="card kpi"><div class="label">总 token</div><div class="value" id="cc-tokens">—</div><div class="foot" id="cc-tokens-foot">输入 / 输出</div></div>
-        <div class="card kpi"><div class="label">总请求</div><div class="value" id="cc-runs">—</div><div class="foot" id="cc-runs-foot">成功 / 失败</div></div>
-        <div class="card kpi"><div class="label">本期花费</div><div class="value" id="cc-cost">—</div><div class="foot" id="cc-cost-foot">平均每次</div></div>
-        <div class="card kpi"><div class="label">成功率</div><div class="value" id="cc-success">—</div><div class="foot" id="cc-success-foot">计费周期内</div></div>
-      </div>
-
-      <div class="section-title" id="cc-quota-title">额度与套餐</div>
-      <div class="grid two">
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <span class="plan-pill" id="cc-plan">—</span>
-            <span class="muted" id="cc-remaining">—</span>
+      <!-- ── Command Code ── -->
+      <section id="view-cc">
+        <div class="section">
+          <div class="section-h">
+            <h2><span class="slash">//</span>Overview</h2>
+            <div class="meta" id="cc-overview-meta"></div>
           </div>
-          <div class="bars" style="margin-top:16px">
-            <div class="bar-row"><div class="bar-label">5 小时</div><div class="bar-track"><div class="bar-fill" id="bar-5h" style="width:0"></div></div><div class="bar-value" id="val-5h">—</div></div>
-            <div class="bar-row"><div class="bar-label">本周</div><div class="bar-track"><div class="bar-fill" id="bar-w" style="width:0"></div></div><div class="bar-value" id="val-w">—</div></div>
-            <div class="bar-row"><div class="bar-label">本月</div><div class="bar-track"><div class="bar-fill" id="bar-m" style="width:0"></div></div><div class="bar-value" id="val-m">—</div></div>
+          <div class="grid kpis" id="cc-kpis"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-h">
+            <h2><span class="slash">//</span>Usage Limits</h2>
+            <div class="meta" id="cc-plan"></div>
+          </div>
+          <div class="grid split">
+            <div class="card big">
+              <div class="tick tl"></div><div class="tick tr"></div><div class="tick bl"></div><div class="tick br"></div>
+              <div class="kpi-label">Window limits</div>
+              <div class="limits" id="cc-limits" style="margin-top:16px"></div>
+            </div>
+            <div class="card big">
+              <div class="tick tl"></div><div class="tick tr"></div><div class="tick bl"></div><div class="tick br"></div>
+              <div class="kpi-label">Request rate</div>
+              <div id="cc-freq" style="margin-top:8px"></div>
+            </div>
           </div>
         </div>
-        <div class="card">
-          <div class="label muted" style="font-size:12px">调用频率（图表接口 · 每个时间桶的请求数）</div>
-          <div id="cc-freq" style="margin-top:12px"></div>
+
+        <div class="section">
+          <div class="section-h">
+            <h2><span class="slash">//</span>Models</h2>
+            <div class="meta" id="cc-models-meta"></div>
+          </div>
+          <div class="card big" style="padding:0">
+            <div class="tick tl"></div><div class="tick tr"></div><div class="tick bl"></div><div class="tick br"></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Model</th><th class="r">Runs</th><th class="r">Input</th><th class="r">Output</th>
+                  <th class="r">Total</th><th class="r">Cost</th><th class="r">Cache saved</th><th class="r">Avg time</th>
+                </tr></thead>
+                <tbody id="cc-models"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="section-title">各模型用量</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>模型</th><th class="num">请求</th><th class="num">输入</th><th class="num">输出</th>
-            <th class="num">总计</th><th class="num">花费</th><th class="num">缓存节省</th><th class="num">均耗时</th>
-          </tr></thead>
-          <tbody id="cc-models"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
-        </table>
-      </div>
+        <div class="section">
+          <div class="section-h">
+            <h2><span class="slash">//</span>Recent runs</h2>
+            <div class="meta" id="cc-recent-meta"></div>
+          </div>
+          <div class="card big" style="padding:0">
+            <div class="tick tl"></div><div class="tick tr"></div><div class="tick bl"></div><div class="tick br"></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Time</th><th>Model</th><th>Status</th><th class="r">Input</th><th class="r">Output</th><th class="r">Timing</th><th class="r">Cost</th>
+                </tr></thead>
+                <tbody id="cc-recent"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div class="section-title">最近调用明细 <span class="muted" id="cc-detail-note"></span></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>时间</th><th>模型</th><th>状态</th><th class="num">输入</th><th class="num">输出</th><th class="num">耗时</th><th class="num">花费</th>
-          </tr></thead>
-          <tbody id="cc-recent"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody>
-        </table>
+      <!-- ── DeepSeek ── -->
+      <section id="view-ds" class="hidden">
+        <div class="section">
+          <div class="section-h">
+            <h2><span class="slash">//</span>Balance</h2>
+            <div class="meta" id="ds-meta"></div>
+          </div>
+          <div class="grid kpis" id="ds-kpis"></div>
+        </div>
+        <div class="section">
+          <div class="section-h">
+            <h2><span class="slash">//</span>Model usage</h2>
+            <div class="meta" id="ds-usage-meta"></div>
+          </div>
+          <div class="card big" style="padding:0">
+            <div class="tick tl"></div><div class="tick tr"></div><div class="tick bl"></div><div class="tick br"></div>
+            <div class="table-wrap" id="ds-table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Model</th><th class="r">Key 数</th><th class="r">请求</th><th class="r">缓存命中</th>
+                  <th class="r">缓存未命中</th><th class="r">输出</th><th class="r">总 token</th><th class="r">费用</th>
+                </tr></thead>
+                <tbody id="ds-models"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
       </div>
-    </section>
-
-    <!-- ── DeepSeek ── -->
-    <section id="view-ds" class="hidden">
-      <div class="grid kpis">
-        <div class="card kpi"><div class="label">账户余额</div><div class="value" id="ds-balance">—</div><div class="foot" id="ds-balance-foot">官方 /user/balance</div></div>
-        <div class="card kpi"><div class="label">充值余额</div><div class="value" id="ds-topup">—</div><div class="foot">topped_up_balance</div></div>
-        <div class="card kpi"><div class="label">赠送余额</div><div class="value" id="ds-granted">—</div><div class="foot">granted_balance</div></div>
-        <div class="card kpi"><div class="label">平台用量窗口</div><div class="value" id="ds-window">—</div><div class="foot" id="ds-window-foot">需 userToken</div></div>
-      </div>
-
-      <div class="section-title">各模型用量（platform.deepseek.com）</div>
-      <div id="ds-blocked"></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>模型</th><th class="num">API Key</th><th class="num">请求</th><th class="num">缓存命中</th>
-            <th class="num">缓存未命中</th><th class="num">输出</th><th class="num">总计 token</th><th class="num">费用</th>
-          </tr></thead>
-          <tbody id="ds-models"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+    </div>
+  </div>
 </div>
 
 <script>
 const API = document.body.dataset.api;
-let days = 7;
-let auto = true;
-let timer = null;
+let days = 7, auto = true, timer = null;
 
-// ── 格式化 ──
 function fmtCount(n){
   n = Number(n) || 0;
   if (n < 1000) return String(Math.round(n));
-  if (n < 1e6) return (n/1e3).toFixed(n < 1e4 ? 1 : 0) + 'k';
+  if (n < 1e6) return (n/1e3).toFixed(n < 1e4 ? 1 : 0) + 'K';
   if (n < 1e9) return (n/1e6).toFixed(n < 1e7 ? 2 : 1) + 'M';
-  return (n/1e9).toFixed(2) + 'G';
+  return (n/1e9).toFixed(2) + 'B';
 }
-function fmtMoney(n, cur){
+function fmtBalance(n, cur){
   n = Number(n) || 0;
-  const sym = cur === 'USD' ? '$' : cur === 'CNY' ? '¥' : '';
-  if (!cur) return '$' + n.toFixed(n < 1 ? 4 : 2);
-  return sym + n.toFixed(n < 1 ? 4 : 2);
+  return (cur === 'CNY' ? '¥' : '$') + n.toFixed(2);
+}
+function fmtCost(n, cur){
+  n = Number(n) || 0;
+  // 单次花费可能只有零点几美分，<0.01 时才给 4 位小数
+  const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
+  return (cur === 'CNY' ? '¥' : '$') + n.toFixed(digits);
 }
 function fmtMs(ms){ ms = Number(ms) || 0; return ms >= 1000 ? (ms/1000).toFixed(1) + 's' : Math.round(ms) + 'ms'; }
 function fmtTime(ms){
-  if (!ms) return '—';
-  const d = new Date(ms), p = (x) => String(x).padStart(2, '0');
+  const d = new Date(Number(ms) || 0), p = (x) => String(x).padStart(2, '0');
   return p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
-function fmtPct(v){ return v == null ? '—' : (v >= 10 ? Math.round(v) : v.toFixed(1)) + '%'; }
-function barColor(p){
-  if (p == null) return 'var(--muted-foreground)';
-  return p > 90 ? 'var(--danger)' : p > 75 ? 'var(--warning)' : p > 50 ? '#a1a1aa' : 'var(--success)';
-}
+function fmtPct(v){ return v == null ? '—' : Number(v).toFixed(1) + '%'; }
+function fmtInt(n){ return (Number(n) || 0).toLocaleString('en-US'); }
+function fmtMoney2(n){ return '$' + (Number(n) || 0).toFixed(2); }
+function secColor(p){ return p == null ? 'var(--muted-foreground)' : p > 90 ? 'var(--danger)' : p > 75 ? 'var(--warning)' : p > 50 ? '#a1a1aa' : 'var(--success)'; }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function spark(values, width, height){
+
+// 柱状迷你图：与参考页同款——高度按比例，透明度自下而上 0.35 → 1
+function bars(values, highlightLast){
   if (!values || values.length === 0) return '';
   const max = Math.max.apply(null, values.concat([1]));
-  const step = values.length > 1 ? width / (values.length - 1) : width;
-  const pts = values.map((v, i) => (i * step).toFixed(1) + ',' + (height - (v / max) * (height - 2) - 1).toFixed(1));
-  const area = '0,' + height + ' ' + pts.join(' ') + ' ' + width + ',' + height;
-  return '<svg class="spark" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '">'
-    + '<polygon fill="var(--brand)" fill-opacity="0.18" points="' + area + '"/>'
-    + '<polyline fill="none" stroke="var(--brand-text)" stroke-width="1.5" points="' + pts.join(' ') + '"/>'
-    + '</svg>';
-}
-function set(id, text){ const el = document.getElementById(id); if (el) el.textContent = text; }
-function setHtml(id, html){ const el = document.getElementById(id); if (el) el.innerHTML = html; }
-function dot(id, state){
-  const el = document.getElementById(id);
-  if (el) el.className = 'nav-dot' + (state === 'err' ? ' err' : state === 'warn' ? ' warn' : '');
+  return values.map(function(v, i){
+    const h = Math.max(4, Math.round((v / max) * 100));
+    const op = (0.35 + (0.65 * (i / Math.max(1, values.length - 1)))).toFixed(2);
+    const hi = highlightLast && i >= values.length - 3;
+    return '<i class="' + (hi ? 'hi' : '') + '" style="height:' + h + '%;opacity:' + op + '"></i>';
+  }).join('');
 }
 
-// ── 渲染：Command Code ──
+function kpiCard(icon, label, value, unit, series, sub, opts){
+  const o = opts || {};
+  const foot = (series && series.length)
+    ? '<div class="bars">' + bars(series, true) + '</div>'
+    : (o.meter != null
+        ? '<div class="meter"><i style="width:' + Math.max(1, Math.min(100, o.meter)) + '%;background:' + (o.meterColor || 'var(--success)') + '"></i></div>'
+        : '');
+  return '<div class="card">'
+    + '<div class="tick tl"></div><div class="tick tr"></div><div class="tick bl"></div><div class="tick br"></div>'
+    + '<div class="kpi-label">' + icon + '<span>' + esc(label) + '</span></div>'
+    + '<div class="kpi-value"><b class="num' + (o.soft ? ' soft' : '') + '">' + esc(value) + '</b>' + (unit ? '<span>' + esc(unit) + '</span>' : '') + '</div>'
+    + foot
+    + (sub ? '<div class="kpi-note">' + esc(sub) + '</div>' : '')
+    + '</div>';
+}
+const ICONS = {
+  tokens: '<svg viewBox="0 0 24 24" fill="none"><path d="M12.5 6.85h-1L10.25 10.1 7 11.35v1l3.25 1.25 1.25 3.25h1l1.25-3.25L17 12.35v-1l-3.25-1.25z" stroke="currentColor" stroke-linecap="square"/><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-linecap="square"/></svg>',
+  runs: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-linecap="square"/></svg>',
+  cost: '<svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="17" height="15" stroke="currentColor" stroke-linecap="square"/><path d="M8 9.5h8M8 14.5h5" stroke="currentColor" stroke-linecap="square"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5 21.5 6v5.9c0 5-4.5 7.6-9.5 9.6-5-2-9.5-4.6-9.5-9.6V6z" stroke="currentColor" stroke-linecap="square"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-linecap="square"/><path d="M12 6.5V12l4 2.5" stroke="currentColor" stroke-linecap="square"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="6.5" width="18" height="12" stroke="currentColor" stroke-linecap="square"/><path d="M3 10.5h18" stroke="currentColor" stroke-linecap="square"/></svg>',
+};
+
+function emptyRow(cols, text, action){
+  // 用 data-goto + 事件委托，避免内联 onclick（模板字符串里转义引号极易踩坑）
+  return '<tr class="empty-row"><td colspan="' + cols + '"><div class="empty-actions">'
+    + '<span>' + esc(text) + '</span>'
+    + (action ? '<button class="btn-link" data-goto="banners">' + esc(action) + '</button>' : '')
+    + '</div></td></tr>';
+}
+
+function set(id, v){ const el = document.getElementById(id); if (el) el.textContent = v; }
+function setHtml(id, v){ const el = document.getElementById(id); if (el) el.innerHTML = v; }
+function dot(id, state){ const el = document.getElementById(id); if (el) el.className = 'dot' + (state === 'err' ? ' err' : state === 'warn' ? ' warn' : ''); }
+
 function renderCC(cc){
-  const s = cc.summary;
-  if (s){
-    set('cc-tokens', fmtCount(s.tokens));
-    set('cc-tokens-foot', '输入 ' + fmtCount(s.tokensIn) + ' / 输出 ' + fmtCount(s.tokensOut));
-    set('cc-runs', String(s.totalCount));
-    set('cc-runs-foot', '成功 ' + s.completedCount + ' / 失败 ' + s.failedCount);
-    set('cc-cost', fmtMoney(s.totalCost, 'USD'));
-    set('cc-cost-foot', '平均每次 ' + fmtMoney(s.averageCost, 'USD'));
-    set('cc-success', fmtPct(s.successRate));
-    set('cc-success-foot', '计费周期内（' + (cc.detailPages || 0) + ' 页明细）');
-  }
-  const q = cc.quota || {};
-  set('cc-plan', '套餐 ' + (q.planLabel || '—') + (q.monthlyCap ? ' · $' + q.monthlyCap + '/月' : ''));
-  set('cc-remaining', q.monthlyRemaining != null ? '本期剩余 $' + q.monthlyRemaining.toFixed(2) : '剩余额度未知');
-  const bars = [['5h', q.fiveHour, q.fiveHourUsed, q.fiveHourCap], ['w', q.weekly, q.weeklyUsed, q.weeklyCap], ['m', q.monthly, null, null]];
-  bars.forEach(function(b){
-    const fill = document.getElementById('bar-' + b[0]);
-    const p = b[1];
-    if (fill){
-      fill.style.width = (p == null ? 0 : Math.max(2, Math.min(100, p))) + '%';
-      fill.style.background = barColor(p);
-    }
-    const windows = { '5h': '5 小时', 'w': '本周', 'm': '本月' };
-    let text = windows[b[0]] + ' ' + fmtPct(p);
-    if (b[2] != null && b[3] && b[2] > 0) text += '（$' + b[2].toFixed(2) + ' / $' + b[3].toFixed(2) + '）';
-    if (b[0] === 'm' && q.monthlyRemaining != null && q.monthlyCap) text += '（已用 $' + (q.monthlyCap - q.monthlyRemaining).toFixed(2) + ' / $' + q.monthlyCap + '）';
-    set('val-' + b[0], text);
-  });
-
-  // 频率
+  const s = cc.summary || {};
   const freq = cc.freq || [];
-  setHtml('cc-freq', freq.length === 0
-    ? '<div class="muted" style="font-size:12.5px">暂无数据</div>'
-    : freq.map(function(r){
-        return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
-          + '<div class="mono" style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.model) + '</div>'
-          + '<div class="muted" style="font-size:12px;white-space:nowrap">' + r.requests + ' 次 · ' + Math.round(r.perHour) + '/h · 峰 ' + r.peak + '</div>'
-          + '<div>' + spark(r.values, 130, 22) + '</div>'
-          + '</div>';
-      }).join(''));
+  // 时间桶宽度（图表接口不直接给，用窗口跨度 / 桶数推算），用于解释「峰值/桶」
+  const bucketMinutes = (cc.chartWindow && freq.length && freq[0].values.length)
+    ? Math.max(1, Math.round((cc.chartWindow.to - cc.chartWindow.from) / 60000 / freq[0].values.length))
+    : null;
+  const sr = cc.series || { requests: [], tokens: [], cost: [] };
 
-  // 模型表
+  setHtml('cc-kpis',
+    kpiCard(ICONS.tokens, 'Total Tokens', fmtCount(s.tokens), '', sr.tokens,
+      s.tokens ? '输入 ' + fmtCount(s.tokensIn) + ' · 输出 ' + fmtCount(s.tokensOut) : '')
+    + kpiCard(ICONS.runs, 'Total Runs', fmtInt(s.totalCount), '', sr.requests,
+        s.totalCount ? '完成 ' + fmtInt(s.completedCount) + ' · 失败 ' + fmtInt(s.failedCount) : '')
+    + kpiCard(ICONS.cost, 'Total Cost', fmtCost(s.totalCost, 'USD'), '', sr.cost,
+        '平均 ' + fmtCost(s.averageCost, 'USD') + ' / 次')
+    + kpiCard(ICONS.ok, 'Success Rate', fmtPct(s.successRate), '', null,
+        '完成 ' + fmtInt(s.completedCount) + ' · 失败 ' + fmtInt(s.failedCount),
+        { meter: s.successRate }));
+
+  const q = cc.quota || {};
+  const low = q.monthlyRemaining != null && q.monthlyCap > 0 && q.monthlyRemaining <= q.monthlyCap * 0.1;
+  setHtml('cc-plan',
+    '<span class="muted mono" style="font-size:.6875rem">' + esc(q.planLabel || '—')
+      + (q.monthlyCap ? ' · $' + q.monthlyCap + '/月' : '') + '</span>'
+    + (q.monthlyRemaining != null
+        ? '<span class="pill' + (low ? ' hot' : '') + '">本月 ' + fmtPct(q.monthly)
+            + ' · 剩余 ' + fmtMoney2(q.monthlyRemaining) + '</span>'
+        : ''));
+  set('cc-overview-meta', cc.chartWindow ? ('图表窗口 ' + fmtTime(cc.chartWindow.from) + ' → ' + fmtTime(cc.chartWindow.to)) : '');
+
+  const limits = [
+    ['5 hour', q.fiveHour, q.fiveHourUsed, q.fiveHourCap],
+    ['weekly', q.weekly, q.weeklyUsed, q.weeklyCap],
+    ['monthly', q.monthly, q.monthlyCap && q.monthlyRemaining != null ? q.monthlyCap - q.monthlyRemaining : null, q.monthlyCap],
+  ];
+  setHtml('cc-limits', limits.map(function(row){
+    const pct = row[1];
+    const used = row[2], cap = row[3];
+    const fill = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+    const hot = pct != null && pct > 90;
+    return '<div' + (hot ? ' class="limit hot"' : '') + '>'
+      + '<div class="limit-top"><span class="name">' + row[0] + '</span>'
+      + '<span class="val"><b' + (hot ? ' class="hot"' : '') + '>' + fmtPct(pct) + '</b>'
+      + (used != null && cap ? '　$' + Number(used).toFixed(2) + ' / $' + Number(cap).toFixed(2) : '') + '</span></div>'
+      + '<div class="track"><i style="width:' + fill + '%;background:' + secColor(pct) + '"></i></div>'
+      + '</div>';
+  }).join(''));
+
+  setHtml('cc-freq', freq.length === 0 ? '<div class="empty">暂无数据</div>' : freq.map(function(f){
+    const short = String(f.model).split('/').pop();
+    return '<div class="freq-row">'
+      + '<span class="freq-name" title="' + esc(f.model) + '">' + esc(short) + '</span>'
+      + '<span class="freq-meta">' + fmtInt(f.requests) + ' 次 · 平均 ' + Math.round(f.perHour) + '/小时 · 峰值 '
+        + f.peak + '/桶' + (bucketMinutes ? '（约 ' + bucketMinutes + ' 分钟）' : '') + '</span>'
+      + '<span class="freq-bars">' + bars(f.values, true) + '</span>'
+      + '</div>';
+  }).join(''));
+
   const models = cc.models || [];
-  setHtml('cc-models', models.length === 0
-    ? '<tr><td colspan="8" class="empty">暂无数据</td></tr>'
-    : models.map(function(m){
-        return '<tr>'
-          + '<td class="mono">' + esc(m.model) + '</td>'
-          + '<td class="num">' + m.requests + (m.failed ? ' <span class="tag fail">' + m.failed + ' 失败</span>' : '') + '</td>'
-          + '<td class="num">' + fmtCount(m.tokensIn) + '</td>'
-          + '<td class="num">' + fmtCount(m.tokensOut) + '</td>'
-          + '<td class="num">' + fmtCount(m.tokens) + '</td>'
-          + '<td class="num">' + fmtMoney(m.cost, 'USD') + '</td>'
-          + '<td class="num muted">' + (m.cacheSavings ? fmtMoney(m.cacheSavings, 'USD') : '—') + '</td>'
-          + '<td class="num muted">' + (m.avgDurationMs ? fmtMs(m.avgDurationMs) : '—') + '</td>'
-          + '</tr>';
-      }).join(''));
+  set('cc-models-meta', models.length + ' 个模型');
+  setHtml('cc-models', models.length === 0 ? emptyRow(8, '该窗口内没有模型用量数据。') : models.map(function(m){
+    return '<tr>'
+      + '<td class="model">' + esc(m.model) + '</td>'
+      + '<td class="r">' + m.requests + (m.failed ? ' <span class="badge fail">' + m.failed + ' fail</span>' : '') + '</td>'
+      + '<td class="r">' + fmtCount(m.tokensIn) + '</td>'
+      + '<td class="r">' + fmtCount(m.tokensOut) + '</td>'
+      + '<td class="r">' + fmtCount(m.tokens) + '</td>'
+      + '<td class="r">' + fmtCost(m.cost, 'USD') + '</td>'
+      + '<td class="r muted">' + (m.cacheSavings ? fmtCost(m.cacheSavings, 'USD') : '—') + '</td>'
+      + '<td class="r muted">' + (m.avgDurationMs ? fmtMs(m.avgDurationMs) : '—') + '</td>'
+      + '</tr>';
+  }).join(''));
 
-  // 明细
   const recent = cc.recent || [];
-  const span = cc.detailSpan ? fmtTime(cc.detailSpan.from) + ' → ' + fmtTime(cc.detailSpan.to) : '—';
-  set('cc-detail-note', '（服务端上限 100 条 · 实际跨度 ' + span + '）');
-  setHtml('cc-recent', recent.length === 0
-    ? '<tr><td colspan="7" class="empty">暂无数据</td></tr>'
-    : recent.map(function(r){
-        const ok = !r.status || r.status === 'completed';
-        return '<tr>'
-          + '<td class="muted">' + fmtTime(r.createdAt) + '</td>'
-          + '<td class="mono">' + esc(r.model) + '</td>'
-          + '<td><span class="tag ' + (ok ? 'ok' : 'fail') + '">' + esc(r.status || 'completed') + '</span></td>'
-          + '<td class="num">' + fmtCount(r.tokensIn) + '</td>'
-          + '<td class="num">' + fmtCount(r.tokensOut) + '</td>'
-          + '<td class="num muted">' + fmtMs(r.durationMs) + '</td>'
-          + '<td class="num">' + fmtMoney(r.cost, 'USD') + '</td>'
-          + '</tr>';
-      }).join(''));
+  set('cc-recent-meta', recent.length + ' 条 · 服务端上限 100 条/天');
+  setHtml('cc-recent', recent.length === 0 ? emptyRow(7, '没有调用明细。') : recent.map(function(r){
+    const ok = !r.status || r.status === 'completed';
+    return '<tr>'
+      + '<td class="muted mono" style="font-size:.75rem">' + fmtTime(r.createdAt) + '</td>'
+      + '<td class="model">' + esc(r.model) + '</td>'
+      + '<td><span class="badge ' + (ok ? 'ok' : 'fail') + '">' + esc(r.status || 'completed') + '</span></td>'
+      + '<td class="r">' + fmtCount(r.tokensIn) + '</td>'
+      + '<td class="r">' + fmtCount(r.tokensOut) + '</td>'
+      + '<td class="r muted">' + fmtMs(r.durationMs) + '</td>'
+      + '<td class="r">' + fmtCost(r.cost, 'USD') + '</td>'
+      + '</tr>';
+  }).join(''));
 }
 
-// ── 渲染：DeepSeek ──
+function renderBanners(warns){
+  if (!warns.length) return '';
+  const errs = warns.filter(function(w){ return /失败|未配置 DeepSeek API Key/.test(w); });
+  const soft = warns.filter(function(w){ return errs.indexOf(w) === -1; });
+  const hasTokenHint = soft.some(function(w){ return /平台登录令牌/.test(w); });
+  const blocks = [];
+  if (errs.length) blocks.push('<div class="banner err"><b>数据获取失败</b>' + errs.map(function(w){ return '<div>' + esc(w) + '</div>'; }).join('') + '</div>');
+  if (hasTokenHint) {
+    blocks.push('<div class="banner warn">'
+      + '<div class="banner-line">'
+      + '<span class="banner-title">DeepSeek 各模型用量未启用</span>'
+      + '<span class="muted">仅显示余额</span>'
+      + '<code class="path" title="~/.pi/agent/deepseek-platform-token.txt">deepseek-platform-token.txt</code>'
+      + '<button class="btn-link" data-toggle="more-ds">查看获取方式 ⌄</button>'
+      + '</div>'
+      + '<div class="banner-more hidden" id="more-ds">登录 platform.deepseek.com → F12 → Application → Local Storage → '
+      + '<code>userToken</code> → 复制值 → 在 pi 里执行 <code>/usage ds-token</code> 粘贴（不经过对话记录）。</div>'
+      + '</div>');
+  }
+  const rest = soft.filter(function(w){ return !/平台登录令牌/.test(w); });
+  if (rest.length) blocks.push('<div class="banner">' + rest.map(function(w){ return esc(w); }).join('<br>') + '</div>');
+  return blocks.join('');
+}
+
 function renderDS(ds){
   const b = ds.balance;
-  if (b){
-    set('ds-balance', fmtMoney(b.totalBalance, b.currency));
-    set('ds-balance-foot', (b.isAvailable ? '账户可用' : '账户不可用') + ' · 官方 /user/balance');
-    set('ds-topup', fmtMoney(b.toppedUpBalance, b.currency));
-    set('ds-granted', fmtMoney(b.grantedBalance, b.currency));
-  } else {
-    set('ds-balance', '—'); set('ds-topup', '—'); set('ds-granted', '—');
-  }
+  const hasToken = !!(ds.configured && ds.configured.platform);
+  set('ds-meta', hasToken ? '平台用量已启用' : '仅余额');
+  const usageSeries = ds.usage && ds.usage.rows.length ? ds.usage.rows.map(function(r){ return r.requests; }) : [];
+  setHtml('ds-kpis',
+    kpiCard(ICONS.wallet, 'Balance', b ? fmtBalance(b.totalBalance, b.currency) : '未配置', '', [],
+      b ? '总额 = 充值 + 赠送' : 'auth.json 缺少 deepseek key')
+    + kpiCard(ICONS.cost, 'Topped up', b ? fmtBalance(b.toppedUpBalance, b.currency) : '—', '', [], '充值部分' + (b && b.isAvailable ? ' · 账户可用' : ''))
+    + kpiCard(ICONS.tokens, 'Granted', b ? fmtBalance(b.grantedBalance, b.currency) : '—', '', [], '赠送余额')
+    + kpiCard(ICONS.clock, 'Window', ds.usage ? days + 'D' : '未配置', ds.usage ? '次' : '',
+        usageSeries,
+        ds.usage ? fmtTime(ds.usage.from * 1000) + ' → ' + fmtTime(ds.usage.to * 1000) : '需平台 userToken',
+        ds.usage ? null : { soft: true }));
 
-  const u = ds.usage;
-  if (u){
-    set('ds-window', days + ' 天');
-    set('ds-window-foot', fmtTime(u.from * 1000) + ' → ' + fmtTime(u.to * 1000) + (u.bucket ? ' · ' + u.bucket : ''));
-  } else {
-    set('ds-window', '—');
-    set('ds-window-foot', ds.configured && ds.configured.platform ? '接口不可用' : '需 userToken');
-  }
+  set('ds-usage-meta', ds.usage ? (ds.usage.rows.length + ' model(s) · bucket ' + (ds.usage.bucket || '—')) : 'platform.deepseek.com');
 
-  const rows = (u && u.rows) || [];
+  const rows = (ds.usage && ds.usage.rows) || [];
+  const dsWrap = document.getElementById('ds-table-wrap');
+  if (dsWrap) dsWrap.classList.toggle('empty-mode', rows.length === 0);
   setHtml('ds-models', rows.length === 0
-    ? '<tr><td colspan="8" class="empty">' + (u ? '该时间范围内没有用量' : '未配置平台令牌，无法查询各模型用量') + '</td></tr>'
+    ? emptyRow(8, ds.usage ? '该时间范围内没有用量。' : '未配置平台令牌，无法查询各模型用量。')
     : rows.map(function(r){
         return '<tr>'
-          + '<td class="mono">' + esc(r.model) + '</td>'
-          + '<td class="num">' + r.apiKeys + '</td>'
-          + '<td class="num">' + r.requests + '</td>'
-          + '<td class="num">' + fmtCount(r.promptCacheHitToken) + '</td>'
-          + '<td class="num">' + fmtCount(r.promptCacheMissToken) + '</td>'
-          + '<td class="num">' + fmtCount(r.responseToken) + '</td>'
-          + '<td class="num">' + fmtCount(r.tokens) + '</td>'
-          + '<td class="num">' + (r.cost ? fmtMoney(r.cost, r.currency) : '—') + '</td>'
+          + '<td class="model">' + esc(r.model) + '</td>'
+          + '<td class="r">' + r.apiKeys + '</td>'
+          + '<td class="r">' + r.requests + '</td>'
+          + '<td class="r">' + fmtCount(r.promptCacheHitToken) + '</td>'
+          + '<td class="r">' + fmtCount(r.promptCacheMissToken) + '</td>'
+          + '<td class="r">' + fmtCount(r.responseToken) + '</td>'
+          + '<td class="r">' + fmtCount(r.tokens) + '</td>'
+          + '<td class="r">' + (r.cost ? fmtCost(r.cost, r.currency) : '—') + '</td>'
           + '</tr>';
       }).join(''));
 }
 
-// ── 加载 ──
 async function load(){
   set('subtitle', '正在加载…');
   try {
@@ -407,29 +603,25 @@ async function load(){
     renderDS(data.deepseek || {});
 
     const warns = [];
-    (data.commandcode && data.commandcode.warnings || []).forEach(function(w){ warns.push('Command Code：' + w); });
-    (data.deepseek && data.deepseek.warnings || []).forEach(function(w){ warns.push('DeepSeek：' + w); });
-    setHtml('banners', warns.length === 0 ? '' : warns.map(function(w){
-      const err = /失败|未配置 DeepSeek API Key/.test(w);
-      return '<div class="banner ' + (err ? 'err' : 'warn') + '">' + esc(w) + '</div>';
-    }).join(''));
-    dot('dot-cc', warns.some(function(w){ return /Command Code/.test(w); }) ? 'warn' : 'ok');
-    dot('dot-ds', (data.deepseek && data.deepseek.balance) ? ((data.deepseek.usage) ? 'ok' : 'warn') : 'err');
+    ((data.commandcode && data.commandcode.warnings) || []).forEach(function(w){ warns.push('Command Code：' + w); });
+    ((data.deepseek && data.deepseek.warnings) || []).forEach(function(w){ warns.push('DeepSeek：' + w); });
+    setHtml('banners', renderBanners(warns));
+    const ccWarn = warns.some(function(w){ return /Command Code/.test(w); });
+    dot('dot-cc', ccWarn ? 'warn' : 'ok');
+    set('state-cc', ccWarn ? '异常' : '正常');
+    const dsOk = !!(data.deepseek && data.deepseek.balance);
+    dot('dot-ds', dsOk ? (data.deepseek.usage ? 'ok' : 'warn') : 'err');
+    set('state-ds', dsOk ? (data.deepseek.usage ? '正常' : '仅余额') : '未配置');
 
     set('subtitle', '更新于 ' + fmtTime(data.fetchedAt) + ' · 数据源：Command Code 内部接口 + DeepSeek 官方接口');
   } catch (e){
-    set('subtitle', '加载失败：' + (e && e.message ? e.message : e));
+    set('subtitle', '加载失败');
     setHtml('banners', '<div class="banner err">无法获取数据：' + esc(e && e.message ? e.message : e) + '</div>');
   }
 }
 
-function schedule(){
-  if (timer) clearTimeout(timer);
-  if (!auto) return;
-  timer = setTimeout(function(){ load().then(schedule); }, 60000);
-}
+function schedule(){ if (timer) clearTimeout(timer); if (!auto) return; timer = setTimeout(function(){ load().then(schedule); }, 60000); }
 
-// ── 交互 ──
 document.querySelectorAll('[data-days]').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('[data-days]').forEach(function(b){ b.classList.remove('active'); });
@@ -444,23 +636,35 @@ document.querySelectorAll('[data-tab]').forEach(function(btn){
     document.querySelectorAll('[data-tab]').forEach(function(b){ b.classList.toggle('active', b === btn); });
     document.getElementById('view-cc').classList.toggle('hidden', tab !== 'cc');
     document.getElementById('view-ds').classList.toggle('hidden', tab !== 'ds');
+    // 时间范围只对 DeepSeek 平台接口有效；Command Code 页签上保持原位但置灰（避免工具栏跳位）
+    const rangeEl = document.getElementById('range');
+    rangeEl.dataset.disabled = tab === 'ds' ? '0' : '1';
+    rangeEl.title = tab === 'ds' ? 'DeepSeek 平台用量的时间范围' : 'Command Code 接口窗口由服务端固定，不支持切换';
   });
 });
-const quotaNav = document.getElementById('go-cc-quota');
-if (quotaNav) quotaNav.addEventListener('click', function(){
-  document.querySelector('[data-tab="cc"]').click();
-  const t = document.getElementById('cc-quota-title');
-  if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+document.addEventListener('click', function(e){
+  const toggle = e.target && e.target.closest ? e.target.closest('[data-toggle]') : null;
+  if (toggle) {
+    const box = document.getElementById(toggle.dataset.toggle);
+    if (box) {
+      const hidden = box.classList.toggle('hidden');
+      toggle.textContent = hidden ? '查看获取方式 ⌄' : '收起 ⌃';
+    }
+    return;
+  }
+  const btn = e.target && e.target.closest ? e.target.closest('[data-goto]') : null;
+  if (!btn) return;
+  const target = document.getElementById(btn.dataset.goto);
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 document.getElementById('refresh').addEventListener('click', function(){ load().then(schedule); });
 document.getElementById('auto').addEventListener('click', function(e){
   auto = !auto;
-  e.target.textContent = '自动刷新：' + (auto ? '开' : '关');
+  e.target.textContent = auto ? 'AUTO ◉' : 'AUTO ○';
   schedule();
 });
-
 load().then(schedule);
 </script>
 </body>
-</html>`.replace(/__BASE__/g, base);
+</html>`;
 }

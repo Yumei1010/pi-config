@@ -22,7 +22,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import { dashboardHtml } from "./dashboard-html.ts";
@@ -84,6 +84,47 @@ async function loadPanelData(force: boolean, days = 7): Promise<PanelData> {
 
 // ── 本地 HTTP 服务 ────────────────────────────────────────────
 
+/** 字体缓存目录（Geist / Geist Mono，由 commandcode.ai 取回；取不到就回退系统字体） */
+const FONT_DIR = join(AGENT_DIR, "usage-dashboard-fonts");
+const FONTS: Record<string, string> = {
+  "geist.woff2": "https://commandcode.ai/fonts/geist-variable.woff2",
+  "geist-mono.woff2": "https://commandcode.ai/fonts/geist-mono-variable.woff2",
+};
+const fontCache = new Map<string, Buffer>();
+
+/** 取字体（内存 → 磁盘 → 上游）；失败返回 undefined，页面自动用系统字体 */
+async function loadFont(name: string): Promise<Buffer | undefined> {
+  const mem = fontCache.get(name);
+  if (mem) return mem;
+  const file = join(FONT_DIR, name);
+  try {
+    const buf = await readFile(file);
+    fontCache.set(name, buf);
+    return buf;
+  } catch {
+    /* 未缓存，继续向上游取 */
+  }
+  const url = FONTS[name];
+  if (!url) return undefined;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { "User-Agent": "pi-usage-dashboard" } });
+    if (!res.ok) return undefined;
+    const buf = Buffer.from(await res.arrayBuffer());
+    fontCache.set(name, buf);
+    void (async () => {
+      try {
+        await mkdir(FONT_DIR, { recursive: true });
+        await writeFile(file, buf);
+      } catch {
+        /* 缓存失败不影响本次响应 */
+      }
+    })();
+    return buf;
+  } catch {
+    return undefined;
+  }
+}
+
 interface DashboardServer {
   server: Server;
   port: number;
@@ -140,6 +181,21 @@ async function ensureServer(): Promise<DashboardServer> {
         }
         if (rest === "/api/health") {
           json(res, { ok: true, uptimeMs: process.uptime() * 1000 });
+          return;
+        }
+        if (rest.startsWith("/font/")) {
+          const name = rest.slice("/font/".length);
+          const buf = await loadFont(name);
+          if (!buf) {
+            res.writeHead(404).end();
+            return;
+          }
+          res.writeHead(200, {
+            "Content-Type": "font/woff2",
+            "Cache-Control": "public, max-age=604800",
+            "Content-Length": buf.byteLength,
+          });
+          res.end(buf);
           return;
         }
         json(res, { error: "not found" }, 404);

@@ -185,6 +185,14 @@ export interface CcFreqRow {
   values: number[];
 }
 
+/** 全部模型合并后的按时间桶序列（给 KPI 卡片的柱状迷你图） */
+export interface CcSeries {
+  buckets: number[];
+  requests: number[];
+  tokens: number[];
+  cost: number[];
+}
+
 export interface CcData {
   ok: boolean;
   warnings: string[];
@@ -192,6 +200,7 @@ export interface CcData {
   summary: CcSummary | null;
   models: CcModelRow[];
   freq: CcFreqRow[];
+  series: CcSeries;
   recent: CcRecord[];
   chartWindow: { from: number; to: number } | null;
   detailSpan: { from: number; to: number } | null;
@@ -396,6 +405,25 @@ export function freqRows(buckets: CcBucket[]): CcFreqRow[] {
   return rows.sort((a, b) => b.requests - a.requests);
 }
 
+/** 把所有模型的桶合并成一条总序列（按时间排序） */
+export function mergeSeries(buckets: CcBucket[]): CcSeries {
+  const byBucket = new Map<number, { requests: number; tokens: number; cost: number }>();
+  for (const b of buckets) {
+    const cur = byBucket.get(b.bucket) ?? { requests: 0, tokens: 0, cost: 0 };
+    cur.requests += b.requests;
+    cur.tokens += b.tokens;
+    cur.cost += b.cost;
+    byBucket.set(b.bucket, cur);
+  }
+  const times = [...byBucket.keys()].sort((a, b) => a - b);
+  return {
+    buckets: times,
+    requests: times.map((t) => byBucket.get(t)?.requests ?? 0),
+    tokens: times.map((t) => byBucket.get(t)?.tokens ?? 0),
+    cost: times.map((t) => byBucket.get(t)?.cost ?? 0),
+  };
+}
+
 export function spanOf(times: number[]): { from: number; to: number } | null {
   const valid = times.filter((t) => t > 0);
   if (valid.length === 0) return null;
@@ -411,6 +439,7 @@ export async function fetchCommandCode(): Promise<CcData> {
     summary: null,
     models: [],
     freq: [],
+    series: { buckets: [], requests: [], tokens: [], cost: [] },
     recent: [],
     chartWindow: null,
     detailSpan: null,
@@ -451,6 +480,7 @@ export async function fetchCommandCode(): Promise<CcData> {
     summary,
     models: mergeModelRows(buckets, records.records),
     freq,
+    series: mergeSeries(buckets),
     recent: [...records.records].sort((a, b) => b.createdAt - a.createdAt),
     chartWindow: freq.length > 0 ? { from: freq[0].from, to: freq[0].to } : null,
     detailSpan: spanOf(records.records.map((r) => r.createdAt)),

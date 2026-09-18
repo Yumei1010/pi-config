@@ -56,3 +56,17 @@
 - cookie 与 API Key **只在服务端使用**，不会下发到浏览器；页面只拿到聚合后的数字
 - 会话结束（`session_shutdown`）时自动关闭服务；凭据文件用 `0600` 权限写入
 - 数据带 30 秒缓存，避免频繁打接口；面板内「刷新」会强制重新拉取
+
+## 实现与验收要点
+
+- 页面用**文档级滚动**（侧栏 `position:sticky` + `height:100vh`）：早期版本用「100vh + 内容区内部滚动」，会让浏览器整页截图和页面内查找只看得到首屏，长内容像是被截断
+- 前端 CSS/JS 是拼进 TS 模板字符串的，改动后务必做一次**内联脚本语法自检**——曾因模板字符串吃掉引号转义，导致整段内联 JS 解析失败、页面永远停在「正在加载」：
+
+  ```bash
+  curl -s "$DASH_URL" > /tmp/dash.html
+  python -c "import re,io;s=io.open('/tmp/dash.html',encoding='utf-8').read();io.open('/tmp/dash.js','w',encoding='utf-8').write(re.findall(r'<script>(.*?)</script>',s,re.S)[-1])"
+  node --check /tmp/dash.js
+  ```
+
+- 视觉验收：用 `vision-reviewer` 子代理（`~/.pi/agent/agents/vision-reviewer.md`，模型 `deepseek/deepseek-v4-flash-vision-exp`）读截图做审美评审，比只用计算样式断言更容易发现「看起来像坏了」的问题；终端面板侧仍用 `visibleWidth` 断言不超行
+- 布局要点：KPI 栅格 `repeat(auto-fit, minmax(240px,1fr))`（宽屏 4 列、窄屏自动 2 列），列表数值列右对齐 + `tabular-nums`，卡片用直角 + 四角刻度（与参考站点同语言）
