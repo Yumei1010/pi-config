@@ -1,6 +1,6 @@
 # Pi 开发环境配置
 
-本仓库是一个 **pi package**：9 个自定义插件 + 16 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
+本仓库是一个 **pi package**：10 个自定义插件 + 16 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
 
 ## 安装
 
@@ -35,6 +35,7 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 | **project-memory** | 两级记忆知识库 + GitHub 私有仓库云同步 | [README](extensions/project-memory/README.md) |
 | **conventions-review** | 个人 GFramework 代码规范审查 | [README](extensions/conventions-review/README.md) |
 | **command-chinese** | 指令说明汉化 + /all 指令一览 | [README](extensions/command-chinese/README.md) |
+| **commandcode-usage** | Command Code 各模型用量与调用频率（网页端 usage 页的终端版） | [README](extensions/commandcode-usage/README.md) |
 | **session-auto-name** | 自动提取首条消息作为会话名称 | [README](extensions/session-auto-name/README.md) |
 | **auto-git-context** | 自动注入当前 git 变更到对话上下文 | [README](extensions/auto-git-context/README.md) |
 | **session-tags** | 自动检测关键词为会话条目打标签 | [README](extensions/session-tags/README.md) |
@@ -70,6 +71,7 @@ Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 pr
 | `/switch [ds\|go\|cc\|provider/model]` | 切换模型提供方（`cc`/`cco`/`commandcode` 都是 Command Code） |
 | `/health` | 检查各 provider 的凭据配置与 API 连通性 |
 | `/commandcode-quota` | 查看 Command Code 账号用量与配额（OAuth 版） |
+| `/ccusage [1h\|6h\|12h\|24h\|all\|text]` | Command Code 各模型用量与调用频率面板（cookie 版，含 sparkline） |
 | `/commandcode-status` | 查看 Command Code provider 诊断信息 |
 | `/commandcode-refresh` | 刷新 Command Code 模型目录 |
 | `/memory [global\|save\|clear\|cloud …]` | 两级记忆管理 + 云同步 |
