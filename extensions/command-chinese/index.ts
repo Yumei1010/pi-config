@@ -44,7 +44,8 @@ const CN_MAP: Record<string, string> = {
   memory: "项目记忆（两级记忆）",
   switch: "切换模型提供方",
   conventions: "个人约定审查",
-  ccusage: "Command Code 各模型用量与频率",
+  ccusage: "Command Code 用量（终端面板）",
+  usage: "用量面板（浏览器 / 终端 / 文本）",
   // Narumiruna 插件
   sync: "配置同步",
   goal: "目标管理",
@@ -172,6 +173,12 @@ const SUB_CN_MAP: Record<string, string> = {
   "switch commandcode": "切到 Command Code",
   "switch deepseek": "切到 DeepSeek 直连",
   "switch opencode-go": "切到 OpenCode Go",
+  // usage 参数（用量面板）
+  "usage web": "浏览器打开用量面板",
+  "usage tui": "终端面板查看用量",
+  "usage text": "输出文本用量报告",
+  "usage ds-token": "粘贴 DeepSeek userToken（开启各模型用量）",
+  "usage cc-cookie": "粘贴 commandcode.ai Cookie（换机器时用）",
   // ccusage 参数（Command Code 用量面板）
   "ccusage 1h": "看最近 1 小时",
   "ccusage 6h": "看最近 6 小时",
