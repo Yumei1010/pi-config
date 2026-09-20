@@ -1,6 +1,6 @@
 # Pi 开发环境配置
 
-本仓库是一个 **pi package**：10 个自定义插件 + 16 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
+本仓库是一个 **pi package**：9 个自定义插件 + 16 个依赖插件捆绑发布，一条命令在新电脑上复刻完整 Pi 编码助手配置。
 
 ## 安装
 
@@ -29,7 +29,6 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 | 插件 | 功能 | 文档 |
 |------|------|------|
-| **claude-md-loader** | 自动加载 CLAUDE.md 注入系统提示词 | [README](extensions/claude-md-loader/README.md) |
 | **minimal-statusline** | 极简多彩状态栏（模型/上下文/Token/费用） | [README](extensions/minimal-statusline/README.md) |
 | **provider-switch** | DeepSeek / OpenCode Go / TokenRhythm / Command Code 模型切换 | [README](extensions/provider-switch/README.md) |
 | **project-memory** | 两级记忆知识库 + GitHub 私有仓库云同步 | [README](extensions/project-memory/README.md) |

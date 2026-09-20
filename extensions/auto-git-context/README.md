@@ -20,9 +20,12 @@ agent：看到你改了 src/index.ts（+4/-1），直接开始...
 - 注入位置：系统提示词末尾（不污染用户消息）
 - 触发条件：工作区有未提交变更时才注入，干净时跳过
 
-## 与 claude-md-loader 互补
+## 与 pi 内置能力的分工
 
-| 插件 | 注入内容 | 性质 |
+| 来源 | 注入内容 | 性质 |
 |------|---------|------|
-| claude-md-loader | 项目规范（CLAUDE.md） | 静态 |
-| auto-git-context | 当前未提交变更 | 动态 |
+| pi 内置（`AGENTS.md` / `CLAUDE.md` 发现） | 项目规范 | 静态 |
+| auto-git-context（本插件） | 当前未提交变更 | 动态 |
+
+> 注：项目规范的加载由 pi 内置负责（支持 `AGENTS.override.md` / `AGENTS.md` / `CLAUDE.md` 及祖先目录继承）；
+> 本仓库曾有一个 `claude-md-loader` 插件做同样的事，属重复实现，已于 2026-09-20 删除。

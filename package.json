@@ -1,7 +1,7 @@
 {
   "name": "pi-config",
   "version": "1.0.0",
-  "description": "Yumei 的 Pi 开发环境：10 个自定义扩展 + 16 个依赖插件，一条命令复刻",
+  "description": "Yumei 的 Pi 开发环境：9 个自定义扩展 + 16 个依赖插件，一条命令复刻",
   "private": true,
   "type": "module",
   "keywords": [
