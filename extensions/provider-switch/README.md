@@ -7,7 +7,7 @@
 | 命令 | 效果 |
 |------|------|
 | `/switch` | 打开交互选择器 |
-| `/switch ds` | 切到 DeepSeek 直连（deepseek/deepseek-v4-flash） |
+| `/switch ds` | 切到 DeepSeek 直连（按可用模型动态选，优先 `deepseek-flash`） |
 | `/switch go` | 切到 OpenCode Go（opencode-go/deepseek-v4-flash） |
 | `/switch cc` | 切到 Command Code（`commandcode` provider，动态选默认模型，优先 Sonnet） |
 | `/switch cco` / `cc-oauth` / `commandcode` | 同上（`cc` 的别名） |

@@ -5,7 +5,7 @@
  *
  * 用法：
  *   /switch           打开交互选择器
- *   /switch ds        切到 DeepSeek 直连 (deepseek/deepseek-v4-flash)
+ *   /switch ds        切到 DeepSeek 直连（动态取可用模型，优先 deepseek-flash）
  *   /switch go        切到 OpenCode Go (opencode-go/deepseek-v4-flash)
  *   /switch cc        切到 Command Code（provider id 为 commandcode，由捆绑的
  *                     pi-commandcode-provider 提供，需先 /login）
@@ -21,9 +21,10 @@
  *     （auth.json 里的 command-code 条目仍被 pi-commandcode-provider 当作凭据回退源读取。）
  *   - TokenRhythm（基元律动）provider 与其 /sync-models 命令已于 2026-09-16 移除
  *     （免费额度用尽，不再使用）；如需恢复请查 git 历史。
+ *   - 另含一个「第三方 provider 兼容垫片」：见 installLegacyProviderShim。
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -47,7 +48,7 @@ function isUsableCredential(value: string | undefined): value is string {
 
 // 深色下可读的模型列表（用于交互选择器）
 const OPTIONS: Array<{ provider: string; model: string; label: string }> = [
-  { provider: "deepseek", model: "deepseek-v4-flash", label: "DeepSeek 直连 · V4 Flash" },
+  { provider: "deepseek", model: "deepseek-flash", label: "DeepSeek 直连 · V4.1 Flash" },
   { provider: "deepseek", model: "deepseek-v4-pro", label: "DeepSeek 直连 · V4 Pro" },
   { provider: "opencode-go", model: "deepseek-v4-flash", label: "OpenCode Go · DeepSeek V4 Flash" },
   { provider: "opencode-go", model: "deepseek-v4-pro", label: "OpenCode Go · DeepSeek V4 Pro" },
@@ -77,6 +78,113 @@ const OPENAI_COMPAT_SAFE = {
   supportsDeveloperRole: false,
   supportsReasoningEffort: false,
 };
+
+const msgOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** transcript 里的消息（只声明我们垫片用得到的字段） */
+interface ShimMessage {
+  role?: string;
+  content?: unknown;
+  toolsAdded?: Array<{ name?: string }>;
+  toolsRemoved?: Array<{ name?: string }>;
+}
+
+function textOfContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => (part && typeof part === "object" && (part as { type?: string }).type === "text" ? String((part as { text?: unknown }).text ?? "") : ""))
+    .join("");
+}
+
+/** 还原系统提示词：把所有 system 消息的文本按顺序拼接（等价于 pi 的 getCurrentSystemPrompt） */
+function systemPromptFrom(messages: ShimMessage[] | undefined): string {
+  const parts: string[] = [];
+  for (const m of messages ?? []) {
+    if (m?.role !== "system") continue;
+    const text = textOfContent(m.content);
+    if (text) parts.push(text);
+  }
+  return parts.join("\n\n");
+}
+
+/** 还原工具声明：按顺序应用 toolsRemoved / toolsAdded（等价于 pi 的 getCurrentTools） */
+function toolsFrom(messages: ShimMessage[] | undefined): Array<{ name?: string }> {
+  const tools = new Map<string, { name?: string }>();
+  for (const m of messages ?? []) {
+    if (m?.role !== "system") continue;
+    for (const t of m.toolsRemoved ?? []) if (t?.name) tools.delete(t.name);
+    for (const t of m.toolsAdded ?? []) if (t?.name) tools.set(t.name, t);
+  }
+  return [...tools.values()];
+}
+
+/**
+ * 第三方 provider 兼容垫片（针对 pi 0.86 的 breaking change）
+ *
+ * 0.86 起 provider 的 streamSimple 收到的是「规范化后的 transcript」：systemPrompt 与 tools
+ * 被折叠成一条前置 system 消息，对象上不再有 systemPrompt / tools 字段。而捆绑的
+ * pi-commandcode-provider（0.7.x）仍读 context.systemPrompt / context.tools，于是系统提示词与
+ * 全部工具定义都会丢失（模型拿不到工具）。
+ *
+ * 这里给已注册的 provider 再包一层：从 messages 还原这两个字段并**附加**回同一个对象
+ * （messages 原样保留），于是：
+ *   - 旧实现（读 systemPrompt/tools）恢复正常；
+ *   - 已适配 0.86 的实现（读 messages）不受影响；
+ *   - 若宿主已传旧 shape（或上游自行适配并保留旧字段），检测到就直接透传，不做任何事。
+ */
+function installLegacyProviderShim(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  providerId: string,
+  seen: Set<string>,
+): boolean {
+  // 已注册的 provider 配置挂在 ctx.modelRegistry 上（pi 对象上没有）
+  const cfg = ctx.modelRegistry?.getRegisteredProviderConfig?.(providerId) as
+    | { streamSimple?: (...args: unknown[]) => unknown }
+    | undefined;
+  if (!cfg?.streamSimple) return false;
+  if (seen.has(providerId)) return false;
+
+  const original = cfg.streamSimple;
+  const wrapped = (model: unknown, context: unknown, options?: unknown) => {
+    const ctx = context as { messages?: ShimMessage[]; systemPrompt?: unknown; tools?: unknown } | undefined;
+    // 已是旧 shape（含 systemPrompt 字段）→ 原样透传，避免无谓的重复包装
+    if (!ctx || typeof ctx !== "object" || ctx.systemPrompt !== undefined) {
+      return original(model, context, options);
+    }
+    const patched = {
+      ...ctx,
+      systemPrompt: systemPromptFrom(ctx.messages),
+      tools: toolsFrom(ctx.messages),
+    };
+    return original(model, patched, options);
+  };
+  (wrapped as { __legacyProviderShim?: boolean }).__legacyProviderShim = true;
+
+  pi.registerProvider(providerId, { ...(cfg as Record<string, unknown>), streamSimple: wrapped } as never);
+  seen.add(providerId);
+  return true;
+}
+
+/**
+ * 按优先级从「有凭据的可用模型」里挑第一个。
+ *
+ * 内建 provider 的模型目录会随 pi 升级变动（0.86 就把 deepseek 的 id 改了名），
+ * 写死模型 id 的快捷方式会在升级后失效，因此这里动态解析并在必要时回退到该 provider
+ * 的第一个可用模型。
+ */
+function pickFirstAvailable(
+  ctx: ExtensionContext,
+  provider: string,
+  preferred: string[],
+): string | undefined {
+  const available = ctx.modelRegistry.getAvailable().filter((m) => m.provider === provider);
+  for (const id of preferred) {
+    if (available.some((m) => m.id === id)) return id;
+  }
+  return available[0]?.id;
+}
 
 export default function (pi: ExtensionAPI) {
   // ── 注册 OpenCode Go provider ──────────────────────────────
@@ -171,6 +279,22 @@ export default function (pi: ExtensionAPI) {
     ],
   });
 
+  // ── 第三方 provider 兼容垫片（pi 0.86 的 transcript 规范化） ──
+  const shimmed = new Set<string>();
+  pi.on("session_start", (_event, ctx) => {
+    // 捆绑的 Command Code provider 仍在读旧的 systemPrompt / tools 字段
+    try {
+      const installed = installLegacyProviderShim(pi, ctx, "commandcode", shimmed);
+      // 排障开关：PI_DEBUG_CC_SHIM=1 时把垫片状态打到 stderr
+      if (process.env.PI_DEBUG_CC_SHIM === "1") {
+        console.error(`[provider-switch] commandcode 兼容垫片：${installed ? "已安装" : "无需安装/已安装过"}`);
+      }
+    } catch (e: unknown) {
+      /* 垫片失败不应影响会话启动 */
+      if (process.env.PI_DEBUG_CC_SHIM === "1") console.error(`[provider-switch] 兼容垫片安装失败：${msgOf(e)}`);
+    }
+  });
+
   // ── /switch 命令 ───────────────────────────────────────────
   pi.registerCommand("switch", {
     description: "在 DeepSeek 直连 / OpenCode Go / Command Code 之间切换模型",
@@ -193,8 +317,15 @@ export default function (pi: ExtensionAPI) {
         provider = OPTIONS[idx].provider;
         modelId = OPTIONS[idx].model;
       } else if (arg === "ds" || arg === "deepseek") {
+        // pi 0.86 起内建 deepseek 目录由 deepseek-v4-flash 变为 deepseek-flash，
+        // 写死模型 id 会在升级后失效，因此按优先级动态解析。
         provider = "deepseek";
-        modelId = "deepseek-v4-flash";
+        const picked = pickFirstAvailable(ctx, provider, ["deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro"]);
+        if (!picked) {
+          ctx.ui.notify(`没有可用的 ${provider} 模型：请检查 auth.json 的 deepseek 条目或 DEEPSEEK_API_KEY`, "error");
+          return;
+        }
+        modelId = picked;
       } else if (arg === "go" || arg === "opencode" || arg === "opencode-go") {
         provider = "opencode-go";
         modelId = "deepseek-v4-flash";

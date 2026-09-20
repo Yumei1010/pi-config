@@ -163,6 +163,10 @@ pi update --models         # 刷新模型目录（/model 列表）
 
 1. **类型检查**：`npm run typecheck` 必须 0 错误（CI 也会跑）
 2. **依赖漂移**：devDependencies 的 `@earendil-works/*` 应跟随本机 `pi --version`；升级后重跑 typecheck
+3. **升级 pi 本身（`pi update`）后额外查三件事**：
+   - **捆绑的第三方 provider 是否踩了 breaking change**：0.86 把 provider 的 stream 输入从 `Context` 改成规范化 transcript（systemPrompt/tools 被折进 messages），而 `pi-commandcode-provider` 0.7.x 仍在读旧字段 → 会丢掉系统提示词与全部工具；`provider-switch` 里内置了**附加式垫片**兼容（`PI_DEBUG_CC_SHIM=1` 可看安装状态）
+   - **内建 provider 的模型 id 是否改名**：0.86 把 `deepseek-v4-flash` 改成 `deepseek-flash`，写死模型 id 的快捷方式（如 `/switch ds`）会失效 → 关键快捷方式已改为按可用模型动态解析
+   - **默认 model 是否还在目录里**：`pi --list-models --offline | grep <id>` 确认 `settings.json` 的 `defaultModel` 仍存在
 3. **捆绑插件升级**：`npm outdated` 有新版 → **先确认上游没换设计**（对比工具/命令表，如 pi-subagents 2.x/3.x 删掉了整个委派套件）→ 改 `package.json` 精确版本号 → `npm install` → 校验 `pi.extensions` 里的入口路径仍存在（上游可能把入口从 `src/index.ts` 改成 `dist/index.ts`）→ `npm run typecheck` → `pi --list-models --offline` 看插件是否报错 → 提交推送 → 各机器 `pi update --extensions`
 4. **插件升级后补汉化**：Narumiruna 系列升级后跑 `/all`，看是否有新子命令落到英文（需补 `extensions/command-chinese/index.ts` 的 `SUB_CN_MAP`）
 5. **状态栏配额**：显示 `配额 --` 时先看 `command-code-cookie.txt` 的 `session_token` 是否过期，再运行 `/health`
