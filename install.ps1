@@ -13,6 +13,7 @@ $GitSource = "git:github.com/Yumei1010/pi-config"
 $ExtDir = "$env:USERPROFILE\.pi\agent\extensions"
 
 # 本仓库提供的自定义插件（用于清理旧版复制副本）
+# 历史上由本仓库提供过的插件名（仅用于清理旧版复制残留）
 $OwnExtensions = @("claude-md-loader", "command-chinese", "conventions-review", "minimal-statusline", "project-memory", "provider-switch", "auto-git-context", "session-auto-name", "session-tags")
 
 # 旧版单独安装的依赖包（现已随本包捆绑）
