@@ -164,9 +164,16 @@ async function writeChanges(cwd: string, changes: ChangeRecord[]): Promise<void>
 }
 
 /** 在指定 section 下追加要点；section 不存在则创建 */
-function appendToSection(md: string, section: string, content: string): string {
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export function appendToSection(md: string, section: string, content: string): string {
   const title = SECTION_TITLES[section] ?? section;
-  const bulletPattern = new RegExp(`^##\\s*(?:${title}|${section})\\b.*$`, "m");
+  // 匹配小节标题行，例如 "## 备注 (notes)" / "## 目标 (goal)" / "## 备注"。
+  // 注意：不能用 \b 收尾——JS 的 \b 基于 ASCII 词字符，中文标题（备注/目标…）
+  // 后面永远不构成边界；一旦匹配失败，每次 append 都会新建一个同名小节
+  // （曾把全局记忆叠成 6 个「## 备注 (notes)」）。改用「行尾 + 可选括号注解」的写法。
+  const heading = `^##\\s*(?:${escapeRegExp(title)}|${escapeRegExp(section)})(?:\\s*\\([^)]*\\))?\\s*$`;
+  const bulletPattern = new RegExp(heading, "m");
   const bullets = content
     .split("\n")
     .map((l) => l.replace(/^[-*\s]+/, "").trim())

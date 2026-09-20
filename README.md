@@ -172,6 +172,7 @@ pi update --models         # 刷新模型目录（/model 列表）
 5. **状态栏配额**：显示 `配额 --` 时先看 `command-code-cookie.txt` 的 `session_token` 是否过期，再运行 `/health`
 6. **认证体检**：`/health` 全绿；`git status` 干净、本地不落后 origin
 7. **入口路径**：`node -e "const d=require('./package.json');console.log(d.pi.extensions.filter(p=>!require('fs').existsSync(p)))"` 应输出 `[]`
+8. **记忆文件的小节完整性**：`project-memory` 早期版本用 `\b` 匹配中文小节标题（JS 的 `\b` 对中文永不成立），会让每次 append 都**新建一个同名小节**（表现为文件里出现多个「## 备注 (notes)」）。检查：`grep -c '^## 备注' <memory.md>` 应 ≤ 1；清理：`python scripts/merge-memory-sections.py --dry <文件…>` 先看报告，去掉 `--dry` 就地合并（只合并不删内容，同段内完全相同的条目会去重并计数）
 
 ## 从旧版迁移（复制安装时代）
 
