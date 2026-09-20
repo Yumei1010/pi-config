@@ -43,7 +43,6 @@ const CN_MAP: Record<string, string> = {
   // 本仓库自定义扩展
   memory: "项目记忆（两级记忆）",
   switch: "切换模型提供方",
-  conventions: "个人约定审查",
   // Narumiruna 插件
   sync: "配置同步",
   goal: "目标管理",
@@ -159,9 +158,6 @@ const SUB_CN_MAP: Record<string, string> = {
   "memory cloud status": "云同步状态",
   "memory cloud on": "开启云同步",
   "memory cloud off": "关闭云同步",
-  // conventions 参数
-  "conventions --all": "审查全部未提交变更",
-  "conventions --staged": "审查已暂存变更",
   // switch 参数（cc/cco = 捆绑的 pi-commandcode-provider 注册的 commandcode provider）
   "switch ds": "切到 DeepSeek 直连",
   "switch go": "切到 OpenCode Go",

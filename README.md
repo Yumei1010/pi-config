@@ -32,9 +32,22 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 | **minimal-statusline** | 极简多彩状态栏（模型/上下文/Token/费用） | [README](extensions/minimal-statusline/README.md) |
 | **provider-switch** | DeepSeek / OpenCode Go / TokenRhythm / Command Code 模型切换 | [README](extensions/provider-switch/README.md) |
 | **project-memory** | 两级记忆知识库 + GitHub 私有仓库云同步 | [README](extensions/project-memory/README.md) |
-| **conventions-review** | 个人 GFramework 代码规范审查 | [README](extensions/conventions-review/README.md) |
 | **command-chinese** | 指令说明汉化 + /all 指令一览 | [README](extensions/command-chinese/README.md) |
 | **session-auto-name** | 自动提取首条消息作为会话名称 | [README](extensions/session-auto-name/README.md) |
+
+### 项目级技能（不在本包内）
+
+`gframework-conventions`（GFramework Godot C# 规范审查）不是全局插件，而是**项目级技能**，放在使用它的两个仓库里（`Twenty-four`、`My-GFramework-Godot-Template`）：
+
+```
+.claude/skills/gframework-conventions/
+├── SKILL.md                     规范流程 + 规则速查表
+└── scripts/review.mjs           确定性静态规则引擎（原 conventions-review 扩展移植，零依赖）
+```
+
+技能放 `.claude/skills/` 而非 `.pi/skills/`：前者可随仓库提交、Claude Code 也能直接用；仓库 `.gitignore` 里 `.pi/` 是忽略的（仅用 `!.pi/settings.json` 反向放行），而项目下的 `.pi/settings.json` 内容是 `{"skills": ["../.claude/skills"]}`，把 pi 指过去。项目级技能需该仓库被信任（`pi -a` 或启动时确认）。
+
+> 为什么不是插件：这套规则只对 GFramework 风格项目成立（原扩展在自己的 README 里也这么写）。做成插件时，工具 schema + 提示词条目在每个项目、每轮对话都要占上下文，而且规则副本会与仓库 `CONVENTIONS.md`（权威版本，498+ 行）逐渐漂移。做成技能后常驻上下文只剩 name+description，正文按需加载。
 
 ## 捆绑依赖插件
 
@@ -70,8 +83,9 @@ Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 pr
 | `/commandcode-status` | 查看 Command Code provider 诊断信息 |
 | `/commandcode-refresh` | 刷新 Command Code 模型目录 |
 | `/memory [global\|save\|clear\|cloud …]` | 两级记忆管理 + 云同步 |
-| `/conventions [--all\|--staged\|路径]` | GFramework 代码规范审查 |
 | `/all` | 全部指令 + 中文说明一览 |
+
+> 项目级技能用 `/skill:gframework-conventions` 调用（仅在上方那两个 GFramework 仓库内可用）。
 
 ### 常用内置指令
 
