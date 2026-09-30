@@ -26,6 +26,7 @@ const CN_MAP: Record<string, string> = {
   help: "帮助",
   model: "切换模型",
   settings: "设置",
+  thinking: "设置思考等级",
   compact: "压缩上下文",
   tree: "会话树导航",
   new: "新会话",
@@ -33,6 +34,8 @@ const CN_MAP: Record<string, string> = {
   fork: "分叉会话",
   clone: "克隆会话",
   name: "会话命名",
+  session: "当前会话信息与统计",
+  import: "导入并恢复 JSONL 会话",
   changelog: "更新日志",
   "scoped-models": "模型范围",
   login: "登录",
@@ -40,26 +43,26 @@ const CN_MAP: Record<string, string> = {
   reload: "重载扩展/配置",
   quit: "退出",
   exit: "退出",
+  copy: "复制最后一条回复",
+  export: "导出会话（HTML / JSONL）",
+  share: "上传会话并返回查看链接",
+  bug: "生成发给 pi 开发者的缺陷报告",
+  trust: "保存项目信任决定",
+  hotkeys: "查看当前生效的快捷键",
   // 本仓库自定义扩展
   memory: "项目记忆（两级记忆）",
   switch: "切换模型提供方",
   // Narumiruna 插件
   sync: "配置同步",
-  goal: "目标管理",
   plan: "计划模式",
   retry: "重试上次失败",
   btw: "顺带一提（上下文提示）",
   caffeinate: "防休眠",
   "chrome-devtools": "浏览器调试",
-  firecrawl: "网页抓取",
-  "github-pr": "GitHub PR 操作",
-  "google-genai": "Google AI 搜索/地图",
   lsp: "语言服务器诊断",
   subagents: "子代理管理",
   "wait-what": "等待/澄清",
-  // pi-web-access / pi-mcp-adapter / 其他
-  "web-access": "网页访问",
-  "mcp-adapter": "MCP 适配器",
+  // pi-web-access / pi-commandcode-provider / 其他
   "commandcode-refresh": "刷新 Command Code 模型目录",
   "commandcode-status": "查看 Command Code provider 诊断信息",
   "commandcode-quota": "查看 Command Code 账号用量与配额",
@@ -67,17 +70,18 @@ const CN_MAP: Record<string, string> = {
   curator: "搜索结果整理",
   "google-account": "Google 账号管理",
   search: "搜索",
-  mcp: "MCP 网关",
-  "mcp-auth": "MCP 认证",
+  mcp: "MCP 服务器管理（内置）",
   llama: "本地 Llama 模型",
-  // skill 命令（/skill:<name>）
-  "skill:mcp-scripting": "mcpScript 脚本编写指南",
   // 命令补全可能带 argumentHint（value 形如 "goal"），前缀匹配用
 };
 
 // ── 二级/三级指令（子命令/参数）→ 中文说明映射 ──────────────
 // 键为 "命令名 子命令"，补全候选/help 展示时据此汉化 description
 const SUB_CN_MAP: Record<string, string> = {
+  // 内置 MCP 服务器管理（pi 0.99）
+  "mcp login": "登录需要授权的 MCP 服务器",
+  "mcp logout": "删除已保存的 MCP 凭据",
+  "mcp reconnect": "重连 MCP 服务器",
   // plan 子命令
   "plan start": "启用计划模式（不发送提示词）",
   "plan show": "查看待确认/已保存/进行中的计划",
@@ -89,31 +93,6 @@ const SUB_CN_MAP: Record<string, string> = {
   "plan exit": "退出计划模式或清除当前计划",
   "plan off": "退出计划模式或清除当前计划（exit 别名）",
   "plan tools": "开始计划流程前选择可用工具",
-  // goal 子命令（0.54 起有序队列已移除：add/prioritize/drop-last/skip 不再是子命令）
-  "goal pause": "暂停当前目标",
-  "goal resume": "恢复已停止/预算受限的目标",
-  "goal clear": "清除当前目标",
-  "goal stop": "清除当前目标（clear 的别名）",
-  "goal edit": "编辑当前目标描述",
-  "goal status": "查看当前目标",
-  "goal --tokens": "为目标设置 token 预算",
-  // firecrawl 子命令
-  "firecrawl help": "查看命令用法",
-  "firecrawl config": "查看配置快速开始",
-  "firecrawl quickstart": "查看配置快速开始",
-  "firecrawl status": "查看工具与设置状态",
-  "firecrawl tools": "选择可加载的 Firecrawl 工具",
-  "firecrawl toggle": "选择可加载的 Firecrawl 工具（同 tools）",
-  "firecrawl enable": "启用全部 Firecrawl 工具",
-  "firecrawl disable": "停用全部 Firecrawl 工具",
-  // google-genai 子命令
-  "google-genai init": "创建/更新 Google GenAI 配置",
-  "google-genai status": "查看配置状态",
-  "google-genai config": "查看配置状态",
-  "google-genai help": "查看命令用法",
-  "google-genai tools": "选择 Google GenAI 工具",
-  "google-genai enable": "启用全部工具",
-  "google-genai disable": "停用全部工具",
   // chrome-devtools 子命令
   "chrome-devtools help": "查看命令用法",
   "chrome-devtools quickstart": "查看连接与启动帮助",
@@ -186,9 +165,10 @@ function lookupCn(name: string): string | undefined {
 
 /** 内置命令名（用于 /all 的分组展示） */
 const BUILTIN_NAMES = [
-  "help", "model", "settings", "compact", "tree", "new", "resume",
-  "fork", "clone", "name", "changelog", "scoped-models", "login",
-  "logout", "reload", "quit", "exit",
+  "help", "model", "settings", "thinking", "compact", "tree", "new",
+  "resume", "fork", "clone", "name", "session", "import", "changelog",
+  "scoped-models", "login", "logout", "reload", "quit", "exit",
+  "copy", "export", "share", "bug", "trust", "hotkeys",
 ];
 
 const hasCjk = (s: string) => /[\u4e00-\u9fff]/.test(s);
