@@ -14,7 +14,7 @@
   "pi": {
     "extensions": [
       "extensions",
-      "node_modules/pi-web-access/index.ts",
+      "node_modules/pi-web-access/dist",
       "node_modules/pi-commandcode-provider/index.ts",
       "node_modules/@narumitw/pi-btw/src/index.ts",
       "node_modules/@narumitw/pi-caffeinate/src/index.ts",
@@ -35,16 +35,16 @@
   },
   "dependencies": {
     "@narumitw/pi-btw": "0.61.1",
-    "@narumitw/pi-caffeinate": "0.49.8",
-    "@narumitw/pi-chrome-devtools": "0.53.4",
-    "@narumitw/pi-lsp": "0.49.8",
-    "@narumitw/pi-plan-mode": "0.58.3",
+    "@narumitw/pi-caffeinate": "0.49.9",
+    "@narumitw/pi-chrome-devtools": "0.54.0",
+    "@narumitw/pi-lsp": "0.49.9",
+    "@narumitw/pi-plan-mode": "0.59.2",
     "@narumitw/pi-retry": "0.31.0",
     "@narumitw/pi-subagents": "1.0.2",
-    "@narumitw/pi-sync": "0.51.0",
+    "@narumitw/pi-sync": "0.53.1",
     "@narumitw/pi-wait-what": "0.13.1",
-    "pi-commandcode-provider": "0.7.3",
-    "pi-web-access": "0.33.0"
+    "pi-commandcode-provider": "0.7.5",
+    "pi-web-access": "0.37.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
@@ -53,9 +53,9 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.99.1",
-    "@earendil-works/pi-coding-agent": "0.99.1",
-    "@earendil-works/pi-tui": "0.99.1",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-tui": "1.1.0",
     "@types/node": "^22.10.0",
     "typebox": "1.3.27",
     "typescript": "^5.7.0"
