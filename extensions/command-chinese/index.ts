@@ -200,6 +200,39 @@ function lookupSubCn(cmdName: string, arg: string): string | undefined {
   return undefined;
 }
 
+/**
+ * MCP 服务器状态文本 → 中文。
+ *
+ * `/mcp login|logout|reconnect <server>` 的服务器名补全说明由 pi 内置 MCP 扩展的
+ * describeState() 生成，形如：
+ *   disabled / starting / needs sign-in / connecting… / disconnected
+ *   failed: <错误首行> / connected · 46 tools · 5 resources
+ * 这些字符串不在插件命令表里，只能在补全阶段换算。
+ */
+function translateMcpState(desc: string | undefined): string | undefined {
+  const text = desc?.trim();
+  if (!text) return undefined;
+  switch (text) {
+    case "disabled": return "已禁用";
+    case "starting": return "启动中";
+    case "needs sign-in": return "需要登录";
+    case "connecting…":
+    case "connecting...": return "连接中…";
+    case "disconnected": return "已断开";
+    case "not connected": return "未连接";
+  }
+  if (text.startsWith("failed")) {
+    const detail = text.slice("failed".length).replace(/^:\s*/, "");
+    return detail ? `连接失败：${detail}` : "连接失败";
+  }
+  const m = /^connected(?:\s*·\s*(\d+)\s+tools?)?(?:\s*·\s*(\d+)\s+resources?)?$/.exec(text);
+  if (!m) return undefined;
+  const parts = ["已连接"];
+  if (m[1]) parts.push(`${m[1]} 个工具`);
+  if (m[2]) parts.push(`${m[2]} 个资源`);
+  return parts.join(" · ");
+}
+
 export default function (pi: ExtensionAPI) {
   // 已知命令集合（用于检测新增指令）
   const known = new Set<string>();
@@ -293,7 +326,11 @@ export default function (pi: ExtensionAPI) {
           const raw = String(item.value ?? "").trim();
           // 子命令/参数补全（value 不带 "/"，如 "cloud push"）：查组合键
           if (!raw.startsWith("/") && cmdName) {
-            const subCn = lookupSubCn(cmdName, raw);
+            // MCP 的服务器名补全没有静态表，先换算状态文本（如 "connected · 46 tools"）；
+            // 纯子命令补全无 description，再回退到静态映射；状态换算必须优先于
+            // lookupSubCn，否则 "login github" 会被回退匹配成 "mcp login" 的通用说明。
+            const stateCn = cmdName === "mcp" ? translateMcpState(item.description) : undefined;
+            const subCn = stateCn ?? lookupSubCn(cmdName, raw);
             if (subCn) return { ...item, description: subCn };
           }
           const name = raw.replace(/^\//, "").replace(/:\d+$/, "");
