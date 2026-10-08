@@ -113,6 +113,7 @@ const SUB_CN_MAP: Record<string, string> = {
   "sync files": "选择纳入同步的内容",
   "sync status": "查看同步状态",
   "sync diff": "查看本地/远程差异",
+  "sync conflicts": "查看未解决的私有冲突分组",
   "sync doctor": "检查配置/密钥/锁状态",
   "sync push": "上传本地设置",
   "sync pull": "应用远程设置",
@@ -121,6 +122,13 @@ const SUB_CN_MAP: Record<string, string> = {
   "sync rollback": "回滚到之前的快照",
   "sync migrate-state": "迁移旧状态到 pi-sync/",
   "sync unlock": "移除过期本地锁",
+  // caffeinate 子命令
+  "caffeinate display": "保持系统与显示器不休眠",
+  "caffeinate sleep": "保持系统不休眠，允许显示器休眠",
+  "caffeinate status": "查看当前状态",
+  "caffeinate mode": "选择保持唤醒模式",
+  "caffeinate stop": "暂时释放防休眠",
+  "caffeinate help": "查看命令用法",
   // subagents 子命令
   "subagents settings": "配置子代理用户设置",
   "subagents status": "查看生效的子代理设置",
