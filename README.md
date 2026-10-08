@@ -80,6 +80,26 @@ pi 0.99 把 MCP、codemode（模型写 JS 批量调工具）、tool search 做�
 - **工具暴露方式（`exposure`）**：pi 0.99+ 扩展可让工具不直接声明给模型，而是走 `codemode` / `deferred` / `hidden`。**chrome-devtools 0.54.0 起默认就是 `codemode`**：7 个 `chrome_devtools_*` 不再进模型工具表，需通过内置 codemode 脚本调用；而 codemode 默认不激活，所以要么在 `settings.json` 加 `{ "defaultTools": ["+codemode"] }`（推荐，顺带解锁 MCP/未来插件），要么用 `/chrome-devtools` → Browser settings → Tool mode 改成 `direct`（退回每个工具常驻上下文）或 `lazy`。没配的话工具会静默消失，只在启动时提示一次。
 - 本仓库其余插件（lsp / plan-mode / sync / subagents / web-access / commandcode-provider）仍直接声明工具，未受影响。
 
+### 已配置的 MCP 服务器（2026-10-08）
+
+只有一个，写在用户级 `~/.pi/agent/mcp.json`（凭据不进仓库）：
+
+| server | 传输 | 认证 | exposure |
+|---|---|---|---|
+| `github` | 远程 streamable HTTP `https://api.githubcopilot.com/mcp/` | `Authorization` 由 `!` 命令**运行时**现取 git 凭据管理器里的 token | `codemode`（46 个工具不占每轮上下文） |
+
+```json
+"Authorization": "!echo Bearer $(printf 'protocol=https\\nhost=github.com\\n\\n' | git credential fill 2>/dev/null | sed -n 's/^password=//p')"
+```
+
+- **为什么不用 OAuth**：`pi mcp login github` 直接失败 —— `Authorization server does not support dynamic client registration`。GitHub 远程 MCP 不支持 DCR，pi 只走 DCR / 预注册 client，所以只能走 PAT 路线。
+- **为什么不写死 token**：`headers` / `env` 的值可以是**整条** `!command`（pi 用 `getShellConfig()` 起的 shell，Windows 上优先 Git Bash），每次连接实时现取 GCM 凭据；撤销 GCM 凭据即失效，仓库与 `mcp.json` 里都不落秘密。
+- **GCM token 作用域**：`gho_`（OAuth 应用 token），scopes `gist, repo, workflow`；实测够用（46 工具、`get_me` 正常）。
+- **验证**：`pi mcp list` → `connected, 46 tools`；headless 冒烟 `pi --print "... mcp__github__get_me ..."` → 返回登录名。
+- **加/改服务器后要 `/reload`**（或重开 pi），当前会话不会自动出现 `mcp__github__*`；`mcp__github__*` 只在 codemode 脚本里可达，直接调用需先 `searchTools('github')` 或 `describeNamespace('mcp__github')`。
+- `gh auth token` 是更干净的取法，但本机 gh 未登录；登录后可换成 `"!echo Bearer $(gh auth token)"`。
+- **汉化范围**：`/mcp` 的补全说明（含服务器名状态文本）已在 command-chinese 里汉化；`/mcp` 交互菜单的按钮文字与工具自身的 description 改不了（详见 [command-chinese README](extensions/command-chinese/README.md#说明)）。
+
 ### pi 1.x 的行为变化
 
 - **TUI 默认全屏**（1.0.0 起）：想保留终端正常 scrollback 就把 `tuiMode` 设成 `"regular"`（本机 settings 早已显式写 `fullscreen`，无需改动）。
