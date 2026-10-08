@@ -71,12 +71,21 @@ pi update --extensions   # 拉取本仓库最新提交并重装依赖
 
 保留：chrome-devtools（26 次）、web-access（42 次）、subagents（21 次）、lsp（2 次，按需）、plan-mode（83 条 `plan-mode-state` 条目 ⇒ 在用）、btw / wait-what / sync / retry / caffeinate（命令或事件型，无法测量且无每轮开销）。
 
-### 与 pi 0.99 内置能力的重叠
+### 与 pi 内置能力的重叠
 
-pi 0.99 把 MCP、codemode（模型写 JS 批量调工具）、tool search 做成了**内置扩展**（`builtin:mcp` / `builtin:codemode` / `builtin:tool-search`，可用 `-builtin:<name>` 或 `pi config` 关掉）。相关影响：
+pi 0.99 把 MCP、codemode（模型写 JS 批量调工具）、tool search 做成了**内置扩展**（`builtin:mcp` / `builtin:codemode` / `builtin:tool-search`，可用 `-builtin:<name>` 或 `pi config` 关掉）；pi 1.1 又加了 `--tools +name/-name`（在默认选择上增减而非替换）。相关影响：
 
 - **内置 MCP 已能代替 pi-mcp-adapter**：配 `~/.pi/agent/mcp.json`（或项目 `.pi/mcp.json`）后用 `/mcp` 管理、`pi mcp add|remove|list|login|logout` 命令行管理；服务器工具暴露成 `mcp__<server>__<tool>`，可用 `exposure` 控制何时进上下文，需要批量调用时用内置 codemode。上游适配器（3.x）自己也改用自己的 `mcp-adapter.json`、命令改叫 `/mcp-adapter`，就是为了和内置 MCP 共存——本仓库不再捆绑它。
 - **pi-web-access 0.30+** 默认改成「动态工具激活」：新会话只暴露一个 `web_enable`，模型调用后才出现 `web_search` / `fetch_content` / `source_check` 等（节省每轮上下文）。想回到「一开始就全量可用」，在 `~/.pi/agent/web-search.json` 写 `{ "toolActivation": "eager" }` 并重启 pi。
+- **工具暴露方式（`exposure`）**：pi 0.99+ 扩展可让工具不直接声明给模型，而是走 `codemode` / `deferred` / `hidden`。**chrome-devtools 0.54.0 起默认就是 `codemode`**：7 个 `chrome_devtools_*` 不再进模型工具表，需通过内置 codemode 脚本调用；而 codemode 默认不激活，所以要么在 `settings.json` 加 `{ "defaultTools": ["+codemode"] }`（推荐，顺带解锁 MCP/未来插件），要么用 `/chrome-devtools` → Browser settings → Tool mode 改成 `direct`（退回每个工具常驻上下文）或 `lazy`。没配的话工具会静默消失，只在启动时提示一次。
+- 本仓库其余插件（lsp / plan-mode / sync / subagents / web-access / commandcode-provider）仍直接声明工具，未受影响。
+
+### pi 1.x 的行为变化
+
+- **TUI 默认全屏**（1.0.0 起）：想保留终端正常 scrollback 就把 `tuiMode` 设成 `"regular"`（本机 settings 早已显式写 `fullscreen`，无需改动）。
+- `--provider` 不带 `--model` 不再静默忽略，而是直接报错；`--tools` / `--exclude-tools` 支持 `*` 通配，并新增 `--no-mcp`。
+- `pi update` 在 npm 全局安装下会建议迁移到 pi.dev 的 managed 安装（会把依赖钉死）；另，pi 1.0.1 起发布包不再带 `npm-shrinkwrap.json`。
+- 新扩展 API（`pi.registerToolRenderer()`、工具渲染上下文的 `durationMs`/`outputPad`、`agent_settled` 的 `aborted`）都是附加式，本仓库现有插件不受影响。
 
 ### 刻意锁定不升级的依赖
 
@@ -204,6 +213,7 @@ pi update --models         # 刷新模型目录（/model 列表）
    - **默认 model 是否还在目录里**：`pi --list-models --offline | grep <id>` 确认 `settings.json` 的 `defaultModel` 仍存在
    - **第三方 provider 是否踩了 breaking change**：0.86 把 provider 的 stream 输入改成规范化 transcript（systemPrompt/tools 折进 messages），当时 `pi-commandcode-provider` 0.7.0 会丢掉系统提示词与全部工具，本插件曾自带兼容垫片；**0.7.3 起上游已自带该适配（`src/transcript.ts`），垫片已于 2026-09-30 删除**。复核手法（不靠读代码，靠行为）：`pi -ne -e node_modules/pi-commandcode-provider/index.ts -p --no-session --provider commandcode --model <id> --append-system-prompt "若被问到暗号必须原样回答 MUSTARD-7391" "暗号是什么？"` —— 能答出暗号就说明系统提示词送达（再顺手问一句工具名，能列出工具就是 tools 也送达了）
    - **新版本是否带来新内置扩展/API**：0.99 新增 `builtin:mcp` / `builtin:codemode` / `builtin:tool-search`（`-builtin:<name>` 或 `pi config` 可关），`--no-extensions` 现在也会一并关掉内置扩展；主题新增 `#rgb`/`oklch()`/`okhsl()` 与 `appearance` 字段、默认主题换成 `system`；web-access 0.30+ 默认改成动态工具激活
+   - **插件是否改用新的工具暴露方式**：上游可能把工具改成 `exposure: "codemode"` / `"deferred"`（chrome-devtools 0.54 就是），此时必须启用 `defaultTools: ["+codemode"]` 或在插件设置里切 `direct`/`lazy`，否则工具**静默消失**（pi 只在启动时提示一次）。升级后用本文的暗号实验顺手问一句「列出你要用的浏览器工具」验证
 4. **捆绑插件升级**：`npm outdated` 有新版 → **先确认上游没换设计**（对比工具/命令表，如 pi-subagents 2.x/3.x 删掉了整个委派套件）→ 改 `package.json` 精确版本号 → `npm install` → 校验 `pi.extensions` 里的入口路径仍存在（上游可能把入口从 `src/index.ts` 改成 `dist/index.ts`）→ `npm run typecheck` → `pi --list-models --offline` 看插件是否报错 → 提交推送 → 各机器 `pi update --extensions`
 5. **插件升级后补汉化**：Narumiruna 系列升级后跑 `/all`，看是否有新子命令落到英文（需补 `extensions/command-chinese/index.ts` 的 `SUB_CN_MAP`）
 6. **状态栏配额**：显示 `配额 --` 时先看 `command-code-cookie.txt` 的 `session_token` 是否过期，再运行 `/health`
