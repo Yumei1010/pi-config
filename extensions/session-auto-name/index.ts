@@ -23,6 +23,9 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
+    // pi 1.2 起该事件也会由 pi.sendMessage(triggerTurn) 的 custom 消息触发，
+    // 此时没有 prompt，只应给用户发起的运行命名。
+    if (event.messageType !== "user") return;
     if (named) return;
     if (pi.getSessionName()) {
       named = true;
