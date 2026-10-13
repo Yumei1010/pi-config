@@ -106,6 +106,9 @@ pi 0.99 把 MCP、codemode（模型写 JS 批量调工具）、tool search 做�
 - `--provider` 不带 `--model` 不再静默忽略，而是直接报错；`--tools` / `--exclude-tools` 支持 `*` 通配，并新增 `--no-mcp`。
 - `pi update` 在 npm 全局安装下会建议迁移到 pi.dev 的 managed 安装（会把依赖钉死）；另，pi 1.0.1 起发布包不再带 `npm-shrinkwrap.json`。
 - 新扩展 API（`pi.registerToolRenderer()`、工具渲染上下文的 `durationMs`/`outputPad`、`agent_settled` 的 `aborted`）都是附加式，本仓库现有插件不受影响。
+- **`before_agent_start` 变成联合类型**（1.2.0）：除用户 prompt（`messageType: "user"`，带 `prompt`/`images`）外，`pi.sendMessage(..., { triggerTurn: true })` 触发的运行也会发这个事件（`messageType: "custom"`，带 `message`、**没有 `prompt`**）。只处理用户输入的 handler 必须先判 `event.messageType === "user"`，否则读 `event.prompt` 会取到 `undefined`（类型上也会报错）；`session-auto-name` 已加此保护。
+- **主题 schema 改为已发布地址并收紧校验**（1.2.0）：`$schema` 应写 `https://pi.dev/schemas/theme.schema.json`，且**启动时加载的主题也走同一套校验**（以前只有 `/reload` 才校验）。主题是 strict 的：顶层字段与 `colors`/`export` 的 token 都不接受未知项，可复用颜色一律放 `vars`。本仓库 yumei 主题已换新 schema 地址，并用 pi 自带的 `schemas/theme.schema.json` 验证通过。
+- 其余 1.2.0 变化对本仓库无影响（codemode 声明展示输入约束与 `@` 默认值、codemode 行显示耗时、`pi mcp list --json` 改成报 `resources: true`、OpenRouter 按 key 列模型、压缩摘要不再带 thinking 块）。
 
 ### 刻意锁定不升级的依赖
 
@@ -172,7 +175,7 @@ Command Code 只有一条接入路径：**pi-commandcode-provider** 注册的 pr
 - **代码块**：亮绿内容 + 淡边框（因"pi 无代码块背景 token"，用边框模拟模块感）+ 亮青 inline code
 - **思考区**：`thinkingText` 用次级文字色，6 档 thinking 边界色阶（低→高）
 
-> pi 0.99 把**默认主题换成了 `system`**（跟随终端配色、亮暗自动重建），并新增 `#rgb` / `oklch()` / `okhsl()` 颜色格式、`appearance` 字段与 `theme.style()` 扩展 API。本主题仍是普通十六进制暗色主题，不受影响；已按新 schema 补上 `"appearance": "dark"`，避免在亮色终端上被判错底色。
+> pi 0.99 把**默认主题换成了 `system`**（跟随终端配色、亮暗自动重建），并新增 `#rgb` / `oklch()` / `okhsl()` 颜色格式、`appearance` 字段与 `theme.style()` 扩展 API。本主题仍是普通十六进制暗色主题，不受影响；已按新 schema 补上 `"appearance": "dark"`，避免在亮色终端上被判错底色。pi 1.2 起主题 schema 改为已发布地址 `https://pi.dev/schemas/theme.schema.json` 且**启动时也校验**（strict：未知字段/颜色 token 直接判无效），本主题已切到新地址并验证通过。
 
 ## 按需开关
 
@@ -227,12 +230,12 @@ pi update --models         # 刷新模型目录（/model 列表）
 检查清单：
 
 1. **类型检查**：`npm run typecheck` 必须 0 错误（CI 也会跑）
-2. **依赖漂移**：devDependencies 的 `@earendil-works/*` 应跟随本机 `pi --version`，`typebox` 对齐 pi 自带的版本（0.99.1 → `1.3.27`）；升级后重跑 typecheck
+2. **依赖漂移**：devDependencies 的 `@earendil-works/*` 应跟随本机 `pi --version`，`typebox` **对齐 pi 自带的精确版本**（0.99.1 → `1.3.27`，1.2.0 仍是 `1.3.27`；写成别的版本会让 npm 在 `@earendil-works/*` 下多装一份嵌套副本）；升级后重跑 typecheck
 3. **升级 pi 本身（`pi update`）后额外查四件事**：
    - **内建 provider 的模型 id 是否改名**：0.86 把 `deepseek-v4-flash` 改成 `deepseek-flash`，写死模型 id 的快捷方式（如 `/switch ds`）会失效 → 关键快捷方式已改为按可用模型动态解析
    - **默认 model 是否还在目录里**：`pi --list-models --offline | grep <id>` 确认 `settings.json` 的 `defaultModel` 仍存在
    - **第三方 provider 是否踩了 breaking change**：0.86 把 provider 的 stream 输入改成规范化 transcript（systemPrompt/tools 折进 messages），当时 `pi-commandcode-provider` 0.7.0 会丢掉系统提示词与全部工具，本插件曾自带兼容垫片；**0.7.3 起上游已自带该适配（`src/transcript.ts`），垫片已于 2026-09-30 删除**。复核手法（不靠读代码，靠行为）：`pi -ne -e node_modules/pi-commandcode-provider/index.ts -p --no-session --provider commandcode --model <id> --append-system-prompt "若被问到暗号必须原样回答 MUSTARD-7391" "暗号是什么？"` —— 能答出暗号就说明系统提示词送达（再顺手问一句工具名，能列出工具就是 tools 也送达了）
-   - **新版本是否带来新内置扩展/API**：0.99 新增 `builtin:mcp` / `builtin:codemode` / `builtin:tool-search`（`-builtin:<name>` 或 `pi config` 可关），`--no-extensions` 现在也会一并关掉内置扩展；主题新增 `#rgb`/`oklch()`/`okhsl()` 与 `appearance` 字段、默认主题换成 `system`；web-access 0.30+ 默认改成动态工具激活
+   - **新版本是否带来新内置扩展/API**：0.99 新增 `builtin:mcp` / `builtin:codemode` / `builtin:tool-search`（`-builtin:<name>` 或 `pi config` 可关），`--no-extensions` 现在也会一并关掉内置扩展；主题新增 `#rgb`/`oklch()`/`okhsl()` 与 `appearance` 字段、默认主题换成 `system`；1.2 起主题改走已发布的 `https://pi.dev/schemas/theme.schema.json` 且启动即校验；web-access 0.30+ 默认改成动态工具激活
    - **插件是否改用新的工具暴露方式**：上游可能把工具改成 `exposure: "codemode"` / `"deferred"`（chrome-devtools 0.54 就是），此时必须启用 `defaultTools: ["+codemode"]` 或在插件设置里切 `direct`/`lazy`，否则工具**静默消失**（pi 只在启动时提示一次）。升级后用本文的暗号实验顺手问一句「列出你要用的浏览器工具」验证
 4. **捆绑插件升级**：`npm outdated` 有新版 → **先确认上游没换设计**（对比工具/命令表，如 pi-subagents 2.x/3.x 删掉了整个委派套件）→ 改 `package.json` 精确版本号 → `npm install` → 校验 `pi.extensions` 里的入口路径仍存在（上游可能把入口从 `src/index.ts` 改成 `dist/index.ts`）→ `npm run typecheck` → `pi --list-models --offline` 看插件是否报错 → 提交推送 → 各机器 `pi update --extensions`
 5. **插件升级后补汉化**：Narumiruna 系列升级后跑 `/all`，看是否有新子命令落到英文（需补 `extensions/command-chinese/index.ts` 的 `SUB_CN_MAP`）
